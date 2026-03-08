@@ -1,0 +1,266 @@
+name: Iran-UAE Monitor (Lite + AI)
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: urgentdash-monitor
+  cancel-in-progress: false
+
+jobs:
+  lite:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      should_run: ${{ steps.gate.outputs.should_run }}
+      version: ${{ steps.meta.outputs.version }}
+      run_id: ${{ steps.meta.outputs.run_id }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: |
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Freshness gate
+        id: gate
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "skip_reason=manual" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git fetch origin urgentdash-live --depth=1 || true
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import subprocess
+          from datetime import datetime, timedelta, timezone
+
+          proc = subprocess.run(
+              ["git", "show", "origin/urgentdash-live:live/latest.json"],
+              capture_output=True,
+              text=True,
+          )
+          if proc.returncode != 0:
+              print("should_run=true")
+              print("skip_reason=missing_latest")
+              raise SystemExit(0)
+
+          try:
+              payload = json.loads(proc.stdout)
+          except Exception:
+              print("should_run=true")
+              print("skip_reason=invalid_latest")
+              raise SystemExit(0)
+
+          collected_at = str(payload.get("collectedAt") or "").replace("Z", "+00:00")
+          if not collected_at:
+              print("should_run=true")
+              print("skip_reason=missing_collected_at")
+              raise SystemExit(0)
+
+          dt = datetime.fromisoformat(collected_at)
+          if dt.tzinfo is None:
+              dt = dt.replace(tzinfo=timezone.utc)
+          age = datetime.now(timezone.utc) - dt.astimezone(timezone.utc)
+          if age < timedelta(minutes=25):
+              print("should_run=false")
+              print(f"skip_reason=fresh_{int(age.total_seconds())}")
+          else:
+              print("should_run=true")
+              print(f"skip_reason=stale_{int(age.total_seconds())}")
+          PY
+
+      - name: Run lite stage
+        if: steps.gate.outputs.should_run == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          STORAGE_BACKEND: ${{ secrets.STORAGE_BACKEND }}
+          STORAGE_ENABLED: "true"
+          HEADLESS: "true"
+          LOG_LEVEL: "INFO"
+        run: |
+          python scripts/run_now.py --mode lite
+
+      - name: Capture lite metadata
+        if: steps.gate.outputs.should_run == 'true'
+        id: meta
+        shell: bash
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path("state/ai_input.json").read_text(encoding="utf-8"))
+          print(f"version={payload.get('version', '')}")
+          print(f"run_id={payload.get('run_id', '')}")
+          PY
+
+      - name: Upload lite bundle artifact
+        if: steps.gate.outputs.should_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-bundle-${{ github.run_id }}
+          path: |
+            live
+            state/ai_input.json
+            state/hyie_state.json
+            state/hyie_state.meta.json
+            .health_state.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish lite bundle to urgentdash-live
+        if: steps.gate.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          git fetch origin urgentdash-live:urgentdash-live
+          rm -rf /tmp/urgentdash-live
+          git worktree add /tmp/urgentdash-live urgentdash-live
+          mkdir -p /tmp/urgentdash-live/live
+          rsync -a live/ /tmp/urgentdash-live/live/
+          cd /tmp/urgentdash-live
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add live
+          if git diff --cached --quiet; then
+            echo "No lite changes to publish"
+          else
+            git commit -m "chore: publish lite snapshot ${{ steps.meta.outputs.version }} [skip ci]"
+            git push origin urgentdash-live
+          fi
+          git worktree remove /tmp/urgentdash-live --force
+
+  ai:
+    needs: lite
+    if: needs.lite.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Restore NotebookLM auth profile
+        env:
+          NLM_COOKIES_JSON: ${{ secrets.NLM_COOKIES_JSON }}
+          NLM_METADATA_JSON: ${{ secrets.NLM_METADATA_JSON }}
+        run: |
+          if [ -z "$NLM_COOKIES_JSON" ]; then
+            echo "NLM_COOKIES_JSON not set, skipping profile restore"
+            exit 0
+          fi
+          mkdir -p ~/.notebooklm-mcp-cli/profiles/default
+          chmod 700 ~/.notebooklm-mcp-cli/profiles/default
+          echo "$NLM_COOKIES_JSON" > ~/.notebooklm-mcp-cli/profiles/default/cookies.json
+          chmod 600 ~/.notebooklm-mcp-cli/profiles/default/cookies.json
+          if [ -n "$NLM_METADATA_JSON" ]; then
+            echo "$NLM_METADATA_JSON" > ~/.notebooklm-mcp-cli/profiles/default/metadata.json
+            chmod 600 ~/.notebooklm-mcp-cli/profiles/default/metadata.json
+          fi
+          echo "NotebookLM profile restored."
+
+      - name: Download lite bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: live-bundle-${{ github.run_id }}
+          path: .
+
+      - name: Run AI stage
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_WHATSAPP_FROM: ${{ secrets.TWILIO_WHATSAPP_FROM }}
+          WHATSAPP_RECIPIENTS: ${{ secrets.WHATSAPP_RECIPIENTS }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          STORAGE_BACKEND: ${{ secrets.STORAGE_BACKEND }}
+          STORAGE_ENABLED: "true"
+          HEADLESS: "true"
+          LOG_LEVEL: "INFO"
+          PHASE2_ENABLED: ${{ secrets.PHASE2_ENABLED != '' && secrets.PHASE2_ENABLED || 'false' }}
+          APPROVE_SEND: ${{ secrets.APPROVE_SEND || '' }}
+        run: |
+          python scripts/run_now.py --mode ai --ai-input state/ai_input.json --telegram-send
+
+      - name: Publish AI bundle to urgentdash-live and prune old versions
+        shell: bash
+        run: |
+          git fetch origin urgentdash-live:urgentdash-live
+          rm -rf /tmp/urgentdash-live
+          git worktree add /tmp/urgentdash-live urgentdash-live
+          mkdir -p /tmp/urgentdash-live/live
+          rsync -a live/ /tmp/urgentdash-live/live/
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path(".").resolve()))
+          sys.path.insert(0, str((Path(".").resolve() / "src")))
+
+          from src.iran_monitor.live_publish import prune_old_versions
+
+          removed = prune_old_versions(Path("/tmp/urgentdash-live/live"), keep_days=7)
+          print(f"Pruned versions: {removed}")
+          PY
+          cd /tmp/urgentdash-live
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add live
+          if git diff --cached --quiet; then
+            echo "No AI changes to publish"
+          else
+            git commit -m "chore: publish ai snapshot ${{ needs.lite.outputs.version }} [skip ci]"
+            git push origin urgentdash-live
+          fi
+          git worktree remove /tmp/urgentdash-live --force
+
+      - name: Upload final artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitor-artifacts-${{ github.run_id }}
+          path: |
+            live
+            state
+            reports
+            ledger
+            .health_state.json
+          if-no-files-found: ignore
+          retention-days: 7
