@@ -24,11 +24,17 @@ export function buildLiveArtifactUrl(...segments) {
   return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/live/${path}`;
 }
 
+function withCacheBust(url) {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}ts=${Date.now()}`;
+}
+
 async function fetchUpstreamJson(url) {
-  const response = await fetch(url, {
+  const response = await fetch(withCacheBust(url), {
     headers: {
       Accept: "application/json",
-      "Cache-Control": "no-cache"
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache"
     }
   });
 
