@@ -360,11 +360,21 @@ def _build_hypotheses(values: dict[str, float]) -> list[dict[str, Any]]:
 
 
 def _build_intel_feed(signals: list[SignalEvent], prev_state: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    prev_feed_items = [
+        item for item in (prev_state or {}).get("intel_feed", [])
+        if isinstance(item, dict)
+    ]
     previous_fingerprints = {
         _signal_fingerprint(item.get("src") or item.get("source"), item.get("text") or item.get("summary"))
-        for item in (prev_state or {}).get("intel_feed", [])
-        if isinstance(item, dict)
+        for item in prev_feed_items
     }
+    # Map fingerprint → firstSeenTs from previous feed for staleness tracking.
+    prev_first_seen: dict[tuple[str, str], str] = {}
+    for item in prev_feed_items:
+        fp = _signal_fingerprint(item.get("src") or item.get("source"), item.get("text") or item.get("summary"))
+        first = str(item.get("firstSeenTs") or item.get("tsIso") or item.get("ts") or "")
+        if fp not in prev_first_seen and first:
+            prev_first_seen[fp] = first
 
     official: list[SignalEvent] = []
     fresh: list[SignalEvent] = []
@@ -389,10 +399,24 @@ def _build_intel_feed(signals: list[SignalEvent], prev_state: dict[str, Any] | N
         + sorted(fresh, key=_signal_sort_key, reverse=True)
         + sorted(repeated, key=_signal_sort_key, reverse=True)
     )
+    now_iso = _iso()
     feed: list[dict[str, Any]] = []
     for row in ranked[:24]:
         score = float(row.get("score", 0.0))
         ids = ", ".join(row.get("indicator_ids") or [])
+        fingerprint = _signal_fingerprint(row.get("source") or row.get("source_id"), row.get("summary"))
+
+        if row in official:
+            status = "official"
+        elif row in fresh:
+            status = "fresh"
+        else:
+            status = "repeated"
+
+        first_seen_ts = prev_first_seen.get(fingerprint, "") if status == "repeated" else ""
+        if not first_seen_ts:
+            first_seen_ts = _to_ts_iso(row.get("ts")) or now_iso
+
         feed.append(
             {
                 "ts": _to_ts_iso(row.get("ts")),
@@ -402,6 +426,8 @@ def _build_intel_feed(signals: list[SignalEvent], prev_state: dict[str, Any] | N
                 "text": str(row.get("summary") or "signal"),
                 "src": str(row.get("source") or row.get("source_id") or "unknown"),
                 "impact": f"{ids} updated (score={_round(score, 2)})",
+                "status": status,
+                "firstSeenTs": first_seen_ts,
             }
         )
     return feed

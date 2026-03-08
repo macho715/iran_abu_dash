@@ -35,7 +35,9 @@ function normalizeIntelFeedItem(raw = {}, idx = 0) {
   const text = normalizeWhitespace(raw?.text || "");
   const sources = normalizeWhitespace(raw?.sources || raw?.src || "");
   const id = normalizeWhitespace(raw?.id) || (tsIso ? `${tsIso}-${idx}` : `feed-${idx}-${Math.random().toString(16).slice(2)}`);
-  return { id, ts, tsIso, priority, category, text, sources };
+  const status = normalizeWhitespace(raw?.status || "fresh").toLowerCase();
+  const firstSeenTs = normalizeWhitespace(raw?.firstSeenTs || raw?.first_seen_ts || tsIso || "");
+  return { id, ts, tsIso, priority, category, text, sources, status, firstSeenTs };
 }
 
 function normalizeIndicatorItem(raw = {}, idx = 0) {
