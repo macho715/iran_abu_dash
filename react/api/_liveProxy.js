@@ -29,7 +29,7 @@ function withCacheBust(url) {
   return `${url}${separator}ts=${Date.now()}`;
 }
 
-async function fetchUpstreamJson(url) {
+export async function fetchUpstreamJson(url) {
   const response = await fetch(withCacheBust(url), {
     cache: "no-store",
     headers: {
@@ -47,7 +47,7 @@ async function fetchUpstreamJson(url) {
   };
 }
 
-function applyProxyHeaders(response, upstreamUrl) {
+export function applyProxyHeaders(response, upstreamUrl) {
   response.setHeader("Content-Type", "application/json; charset=utf-8");
   response.setHeader("Cache-Control", "private, no-store, max-age=0, must-revalidate");
   response.setHeader("CDN-Cache-Control", "private, no-store, max-age=0, must-revalidate");
@@ -58,8 +58,7 @@ function applyProxyHeaders(response, upstreamUrl) {
   response.setHeader("X-UrgentDash-Proxy-Version", "2026-03-08-no-store");
 }
 
-export async function proxyLiveJson(response, ...segments) {
-  const upstreamUrl = buildLiveArtifactUrl(...segments);
+export async function proxyUpstreamJson(response, upstreamUrl) {
   applyProxyHeaders(response, upstreamUrl);
 
   try {
@@ -85,4 +84,9 @@ export async function proxyLiveJson(response, ...segments) {
       })
     );
   }
+}
+
+export async function proxyLiveJson(response, ...segments) {
+  const upstreamUrl = buildLiveArtifactUrl(...segments);
+  await proxyUpstreamJson(response, upstreamUrl);
 }
