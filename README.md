@@ -33,7 +33,7 @@ python scripts/run_now.py --mode ai --ai-input state/ai_input.json --telegram-se
 ## GitHub Actions
 
 - 워크플로: `.github/workflows/monitor.yml`
-- 스케줄: `7,22,37,52 * * * *`
+- 스케줄: `12,27,42,57 * * * *`
 - Gate: 마지막 `live/latest.json` 발행 시각이 25분 이내면 skip
 - Job 1: lite stage 실행 후 `live/latest.json`, `live/v/<version>/state-lite.json`, `live/hyie_state.json` 발행
 - Job 2: 같은 version에 대해 AI enrich 실행 후 `live/v/<version>/state-ai.json` 추가 발행
@@ -60,7 +60,12 @@ python scripts/run_now.py --mode ai --ai-input state/ai_input.json --telegram-se
 - `ui/index_v2.html`과 `ui/hyie-erc2-dashboard.jsx`는 레거시 호환 경로다.
 - `db/`, `reports/`, `urgentdash_snapshots/`, `live/v/`, `state/ai_input.json` 같은 로컬 runtime 산출물은 main 브랜치 기준 추적 대상에서 제외한다.
 
-Vercel 배포본은 same-origin `/api/live/latest`, `/api/live/v/...`, `/api/state`를 우선 호출하고, 이 API들은 `urgentdash-live` 브랜치의 `live/` 아티팩트를 no-store 프록시한다. 대시보드 freshness 기준은 1시간이다.
+Vercel 배포본은 same-origin `/api/live/latest`, `/api/live/v/...`, `/api/state`를 우선 호출하고, 이 API들은 `macho715/iran_abu_dash@urgentdash-live`의 `live/` 아티팩트를 no-store 프록시한다. 대시보드 freshness 기준은 1시간이다.
+
+운영 규칙:
+- production upstream은 `macho715/iran_abu_dash@urgentdash-live`로 고정한다.
+- Vercel production에는 `URGENTDASH_GITHUB_OWNER`, `URGENTDASH_GITHUB_REPO`, `URGENTDASH_PUBLISH_BRANCH`를 설정하지 않는다. 값이 있어도 프록시는 무시하고 오배치로 간주한다.
+- Vercel 프로젝트 Git integration은 `macho715/iran_abu_dash`, root directory는 `react`여야 한다.
 
 ## 문서
 

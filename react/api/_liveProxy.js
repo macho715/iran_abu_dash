@@ -1,18 +1,48 @@
 const DEFAULT_OWNER = "macho715";
 const DEFAULT_REPO = "iran_abu_dash";
 const DEFAULT_BRANCH = "urgentdash-live";
+const IGNORED_OVERRIDE_KEYS = [
+  "URGENTDASH_GITHUB_OWNER",
+  "URGENTDASH_GITHUB_REPO",
+  "URGENTDASH_PUBLISH_BRANCH"
+];
 
-function githubRef(value, fallback) {
-  const text = String(value || "").trim();
-  return text || fallback;
+let didWarnIgnoredOverrides = false;
+
+export const FIXED_PUBLISH_SOURCE = Object.freeze({
+  owner: DEFAULT_OWNER,
+  repo: DEFAULT_REPO,
+  branch: DEFAULT_BRANCH
+});
+
+export const FIXED_PUBLISH_SOURCE_LABEL = `${DEFAULT_OWNER}/${DEFAULT_REPO}@${DEFAULT_BRANCH}`;
+
+export function getIgnoredPublishOverrides(env = process.env) {
+  return IGNORED_OVERRIDE_KEYS.flatMap((key) => {
+    const value = String(env?.[key] || "").trim();
+    return value ? [`${key}=${value}`] : [];
+  });
 }
 
-export function getPublishSource() {
-  return {
-    owner: githubRef(process.env.URGENTDASH_GITHUB_OWNER, DEFAULT_OWNER),
-    repo: githubRef(process.env.URGENTDASH_GITHUB_REPO, DEFAULT_REPO),
-    branch: githubRef(process.env.URGENTDASH_PUBLISH_BRANCH, DEFAULT_BRANCH)
-  };
+export function warnIgnoredPublishOverrides(env = process.env, logger = console) {
+  const ignoredOverrides = getIgnoredPublishOverrides(env);
+  if (!ignoredOverrides.length || didWarnIgnoredOverrides) return;
+
+  didWarnIgnoredOverrides = true;
+  if (typeof logger?.warn === "function") {
+    logger.warn(
+      `[urgentdash] Ignoring publish source override(s): ${ignoredOverrides.join(", ")}. Using fixed production source ${FIXED_PUBLISH_SOURCE_LABEL}.`
+    );
+  }
+}
+
+export function resetPublishSourceWarningForTest() {
+  didWarnIgnoredOverrides = false;
+}
+
+export function getPublishSource({ env = process.env, logger = console } = {}) {
+  warnIgnoredPublishOverrides(env, logger);
+  return FIXED_PUBLISH_SOURCE;
 }
 
 export function buildLiveArtifactUrl(...segments) {
@@ -55,7 +85,8 @@ export function applyProxyHeaders(response, upstreamUrl) {
   response.setHeader("Pragma", "no-cache");
   response.setHeader("Expires", "0");
   response.setHeader("X-UrgentDash-Upstream", upstreamUrl);
-  response.setHeader("X-UrgentDash-Proxy-Version", "2026-03-08-no-store");
+  response.setHeader("X-UrgentDash-Publish-Source", FIXED_PUBLISH_SOURCE_LABEL);
+  response.setHeader("X-UrgentDash-Proxy-Version", "2026-03-08-fixed-source");
 }
 
 export async function proxyUpstreamJson(response, upstreamUrl) {
