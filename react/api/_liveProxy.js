@@ -31,6 +31,7 @@ function withCacheBust(url) {
 
 async function fetchUpstreamJson(url) {
   const response = await fetch(withCacheBust(url), {
+    cache: "no-store",
     headers: {
       Accept: "application/json",
       "Cache-Control": "no-cache",
@@ -48,8 +49,13 @@ async function fetchUpstreamJson(url) {
 
 function applyProxyHeaders(response, upstreamUrl) {
   response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "no-store, max-age=0, must-revalidate");
+  response.setHeader("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+  response.setHeader("CDN-Cache-Control", "private, no-store, max-age=0, must-revalidate");
+  response.setHeader("Vercel-CDN-Cache-Control", "no-store");
+  response.setHeader("Pragma", "no-cache");
+  response.setHeader("Expires", "0");
   response.setHeader("X-UrgentDash-Upstream", upstreamUrl);
+  response.setHeader("X-UrgentDash-Proxy-Version", "2026-03-08-no-store");
 }
 
 export async function proxyLiveJson(response, ...segments) {
