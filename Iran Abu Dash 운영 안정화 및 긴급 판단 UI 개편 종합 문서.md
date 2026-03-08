@@ -1,0 +1,1181 @@
+# Iran Abu Dash 운영 안정화 및 긴급 판단 UI 개편 종합 문서
+
+작성일: 2026-03-08
+작성 기준 브랜치: `main`
+작성 기준 HEAD: `6776be7` (`feat: refactor emergency decision simulator`)
+원격 저장소: `git@github.com:macho715/iran_abu_dash.git`
+운영 프런트 주소: `https://react-pi-ivory.vercel.app/`
+운영 API 기준 주소: `https://react-pi-ivory.vercel.app/api/live/latest`, `https://react-pi-ivory.vercel.app/api/state`
+
+**관련 문서**: [README.md](./README.md), [SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md)
+
+### 문서 인덱스
+
+- [README.md](./README.md) - 실행, GHA, 운영 규칙
+- [SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md) - 전체 흐름, API, UI 구성
+- [LAYOUT.md](./LAYOUT.md) - 레이아웃, 탭, 컴포넌트 스펙
+- [COMPONENTS.md](./COMPONENTS.md) - 데이터 흐름, 컴포넌트 상세
+- [의존성.md](./의존성.md) - 전달 경로, GHA, 문제 해결
+- [patchplan.md](./patchplan.md) - implemented patch plan
+
+---
+
+## 1. 문서 목적
+
+이 문서는 이번 작업 사이클 동안 저장소에 반영된 변경 사항을 가능한 한 빠짐없이 남기기 위한 정리 문서다. 단순히 "무엇을 바꿨는지"만 적는 것이 아니라, 다음 내용을 함께 남긴다.
+
+1. 왜 이 변경이 필요했는지
+2. 어떤 파일과 계층에서 수정했는지
+3. 사용자에게 어떤 동작 변화가 생겼는지
+4. 운영 배포 경로에서 무엇을 검증했는지
+5. 현재 시스템이 어떤 상태로 정리되었는지
+
+이번 변경은 한 파일만 만진 작업이 아니라, 아래 영역이 서로 연결된 연속적인 안정화/개선 작업이었다.
+
+- 라이브 포인터/상태 API 프록시 안정화
+- GitHub Actions 스케줄러 동작 정상화
+- Intel Feed의 `fresh / official / repeated` 의미 정리
+- 프런트엔드 상태 배너/헤더/Intel 표시 방식 개선
+- `Simulator`를 슬라이더형 실험 도구에서 `긴급 판단` 화면으로 전환
+- GitHub 및 Vercel 배포 동기화
+
+즉, 이번 작업은 단일 기능 추가가 아니라 "운영 경로 안정화 + 정보 표시 신뢰도 개선 + 의사결정 UI 전환"까지 포함한 묶음 작업이다.
+
+---
+
+## 2. 최종 상태 요약
+
+현재 `main` 브랜치 기준 최종 상태는 다음과 같다.
+
+- GitHub `origin/main` 최신 커밋은 `6776be7`
+- 로컬 작업 디렉터리는 문서 작성 시점 기준으로 정리 가능 상태였고, 이후 이 문서를 추가하는 변경만 남는다
+- 원격 브랜치는 `main`, `urgentdash-live` 중심으로 정리되었다
+- 열린 PR은 없는 상태로 정리되었다
+- Vercel 공개 도메인 `react-pi-ivory.vercel.app`는 새 프런트 번들을 서비스 중이다
+- Vercel API는 `macho715/iran_abu_dash@urgentdash-live`를 upstream으로 사용한다
+- Vercel 프로젝트 Git integration과 root directory도 현재 운영 구조에 맞게 정리되었다
+- GitHub Actions 스케줄러는 15분 주기로 실행되며, 더 이상 25분 freshness gate 때문에 skip되지 않는다
+- `/api/state`는 `latest.json` 포인터를 읽고 `live/v/<version>/state-lite.json` + `state-ai.json`를 합성하는 경로를 사용한다
+- Intel Feed는 단순 최신순이 아니라 `official -> fresh -> repeated` 순으로 정렬되며, 반복 항목은 `firstSeenTs`를 보존한다
+- 프런트엔드의 Intel 탭은 "모든 항목이 repeated일 때만" no-fresh 상태를 표시한다
+- 기존 `Simulator` 탭은 `긴급 판단` 탭으로 대체되었고, 슬라이더 대신 상황 선택 기반 즉시 권고 UI가 제공된다
+- README, 타입, fixture, polling 상수도 현재 구조 기준으로 동기화되었다
+
+---
+
+## 3. 주요 커밋 타임라인
+
+이번 문서에서는 아래 커밋들을 하나의 변경 흐름으로 다룬다.
+
+| 순서 | 커밋 | 제목 | 핵심 목적 |
+|---|---|---|---|
+| 1 | `f91b874` | `fix: disable caching in live proxy` | 라이브 프록시 캐시 무력화 |
+| 2 | `d212c9a` | `fix: prioritize fresh intel feed entries` | Intel Feed에서 신선한 항목 우선 정렬 |
+| 3 | `0a01c7c` | `fix: resolve live state from latest pointer` | 상태 API가 포인터를 기준으로 최신 state를 읽게 수정 |
+| 4 | `b061e63` | `fix: merge lite and ai state artifacts` | `/api/state`가 lite/ai 아티팩트를 병합하도록 수정 |
+| 5 | `d125415` | `fix: add staleness tracking to intel feed items` | repeated 상태와 `firstSeenTs` 추가 |
+| 6 | `d4bf0be` | `fix: pin vercel live proxy upstream` | Vercel upstream 저장소/브랜치 고정 |
+| 7 | `7b67f48` | `fix: refresh scheduled monitor runs` | GitHub Actions freshness gate 제거 + 헤더/Intel/UI 안정화 |
+| 8 | `6776be7` | `feat: refactor emergency decision simulator` | `Simulator`를 `긴급 판단` UI로 전환 |
+
+이후 배포 검증 단계에서 GitHub와 Vercel 반영까지 완료했다.
+
+---
+
+## 4. 작업 흐름 전체 맥락
+
+### 4.1 처음 드러난 문제
+
+초기 문제는 대시보드가 "업데이트가 안 되는 것처럼 보인다"는 체감이었다. 하지만 실제 원인은 한 곳이 아니었다.
+
+1. 일부 경우 Vercel이 잘못된 upstream 저장소를 보고 있었다
+2. 일부 경우 GitHub Actions가 scheduled run을 타더라도 freshness gate 때문에 실제 publish를 skip했다
+3. 일부 경우 Intel Feed가 반복 신호를 새 신호처럼 섞어 보여서 사용자가 "업데이트가 있는지 없는지" 판단하기 어려웠다
+4. 프런트엔드의 기존 `Simulator`는 운영 판단 UI라기보다 내부 raw state 편집기 성격이 강했다
+
+즉, 데이터 경로와 UI 경로 양쪽 모두에서 "사용자는 최신 여부와 행동 권고를 빠르게 판단하고 싶지만, 시스템은 그렇게 보이도록 구성되어 있지 않은 상태"였다.
+
+### 4.2 이번 작업의 방향
+
+그래서 수정 방향은 다음 네 가지로 정리되었다.
+
+1. 운영 API가 항상 올바른 upstream을 읽도록 고정
+2. 스케줄러가 실제로 매 주기 refresh/publish 하도록 수정
+3. Intel Feed에서 `새 항목`과 `반복 항목`의 의미를 분명히 표시
+4. 사용자가 raw state를 건드리지 않고도 "지금 무엇을 해야 하는가"를 즉시 볼 수 있는 UI 제공
+
+이 네 방향이 최종적으로 지금의 구조를 만들었다.
+
+```mermaid
+flowchart TB
+    subgraph DataPath [데이터 경로]
+        GHA[GHA 15분]
+        Latest[latest.json]
+        Lite[lite+ai merge]
+        Proxy[Vercel no-store proxy]
+    end
+
+    subgraph StatePath [상태 해석]
+        Intel[official/fresh/repeated]
+        Stale[stale/source health]
+        NoFresh[repeated-only no-fresh]
+    end
+
+    subgraph UIPath [사용자 행동]
+        Sim[긴급 판단]
+        Action[즉시 권고]
+        Routes[추천 경로]
+    end
+
+    GHA --> Latest
+    Latest --> Lite
+    Lite --> Proxy
+    Proxy --> Intel
+    Intel --> NoFresh
+    Lite --> Stale
+    Sim --> Action
+    Sim --> Routes
+```
+
+---
+
+## 5. 세부 변경 사항
+
+## 5.0 운영 저장소 및 배포 경로 정리
+
+이번 작업에는 코드 패치 외에 저장소와 배포 경로를 정리하는 운영 작업도 포함되었다.
+
+### 5.0.1 브랜치 및 PR 정리
+
+- 원격 브랜치를 `main`과 `urgentdash-live` 중심으로 정리했다
+- 열린 PR은 모두 정리했다
+- 로컬 브랜치도 `main` 기준으로 단순화했고, 이후 `origin/main`과 일치하도록 재정렬했다
+
+### 5.0.2 Git 기준선 정리
+
+- 한 차례 로컬 작업 디렉터리를 `origin/main`과 동일하게 맞춘 뒤 후속 패치를 다시 적용했다
+- 필요 없는 미추적/실험성 산출물은 정리하고 필요한 코드 변경만 커밋했다
+- 결과적으로 이번 변경 묶음은 명시적인 커밋 단위로 정리되었다
+
+### 5.0.3 Vercel 프로젝트 정리
+
+- `react-pi-ivory.vercel.app`에 연결된 프로젝트가 올바른 저장소를 보도록 Git integration을 교정했다
+- 운영 root directory가 `react`인지 확인했다
+- production에서 source selection override env를 사용하지 않는 운영 원칙으로 정리했다
+
+### 5.0.4 운영 의미
+
+이 작업은 코드 변경과 분리된 운영 정리지만, 실제 서비스가 올바른 저장소와 올바른 브랜치를 보도록 만든다는 점에서 매우 중요했다.
+
+## 5.1 라이브 프록시 캐시 무력화
+
+### 관련 커밋
+
+- `f91b874` `fix: disable caching in live proxy`
+
+### 문제
+
+라이브 데이터가 바뀌었음에도 브라우저/CDN/중간 캐시가 예전 응답을 들고 있으면 사용자 입장에서는 업데이트가 안 된 것처럼 보인다.
+
+### 변경 내용
+
+`react/api/_liveProxy.js`에서 upstream fetch에 cache-busting과 no-cache 헤더를 강화했다.
+
+핵심 변경은 다음과 같다.
+
+- upstream URL 뒤에 timestamp query를 붙여 매 요청을 분리
+- `fetch(..., { cache: "no-store" })` 사용
+- `Accept: application/json`, `Cache-Control: no-cache`, `Pragma: no-cache` 사용
+- 응답 헤더에도 `Cache-Control`, `CDN-Cache-Control`, `Vercel-CDN-Cache-Control`, `Pragma`, `Expires`를 일관되게 설정
+
+### 결과
+
+프록시 계층에서 "예전 JSON을 캐시해서 돌려주는" 문제 가능성을 크게 낮췄다.
+
+### 의미
+
+이 작업만으로 모든 업데이트 문제가 해결되지는 않았지만, 이후 문제를 분석할 때 "캐시 때문이 아니라 publish 또는 upstream 쪽 문제"라는 판단을 가능하게 해준 기반 작업이었다.
+
+---
+
+## 5.2 Intel Feed 우선순위 개선 1차: fresh 항목 우선 정렬
+
+### 관련 커밋
+
+- `d212c9a` `fix: prioritize fresh intel feed entries`
+
+### 문제
+
+같은 기사나 같은 source summary가 여러 번 들어오는 환경에서, 새 신호보다 반복 신호가 상단에 섞이면 사용자가 "지금 방금 생긴 변화"를 놓치기 쉽다.
+
+### 변경 내용
+
+백엔드 `src/iran_monitor/state_engine.py`의 `_build_intel_feed()` 정렬 로직을 조정했다.
+
+이 시점의 핵심 목적은 다음 두 가지였다.
+
+- 새로운 항목이 반복 항목보다 먼저 보이도록 우선순위를 보정
+- 테스트로 이 순서를 고정
+
+`tests/test_state_engine.py`에도 fresh/repeated 우선순위를 검증하는 케이스를 추가했다.
+
+### 결과
+
+동일한 반복 기사들이 존재해도, 상대적으로 새 항목이 더 위에 보이도록 정렬 품질이 개선되었다.
+
+---
+
+## 5.3 상태 API를 latest pointer 기준으로 읽도록 수정
+
+### 관련 커밋
+
+- `0a01c7c` `fix: resolve live state from latest pointer`
+
+### 문제
+
+상태 API가 `hyie_state.json` 같은 고정 파일만 직접 읽으면, 최신 publish 포인터와 API 응답이 서로 어긋날 수 있다.
+
+### 변경 내용
+
+`react/api/state.js`가 이제 먼저 `latest.json`을 읽고, 그 안에 있는 artifact 포인터를 해석해 실제 lite state를 불러오도록 수정했다.
+
+핵심 로직:
+
+1. `latest.json` fetch
+2. `pointer.liteUrl` 확인
+3. 포인터가 가리키는 최신 lite state fetch
+4. 실패 시 legacy path fallback
+
+### 결과
+
+프런트엔드 `/api/state`가 "현재 publish된 최신 버전"을 따라가도록 정렬되었다.
+
+---
+
+## 5.4 `/api/state`에서 lite와 ai artifact 병합
+
+### 관련 커밋
+
+- `b061e63` `fix: merge lite and ai state artifacts`
+
+### 문제
+
+이전에는 lite state와 AI 결과가 분리되어 있어, 프런트가 최신 lite를 읽더라도 AI 분석이 직전 상태에 머물거나 누락될 가능성이 있었다.
+
+### 변경 내용
+
+`react/api/state.js`에서 `latest.json`이 제공하는:
+
+- `liteUrl`
+- `aiUrl`
+
+를 각각 읽은 뒤, 최종 응답에서 다음 필드를 합성하도록 수정했다.
+
+- `ai_analysis`
+- `aiVersion`
+- `aiUpdatedAt`
+- `aiStatus`
+
+또한 AI upstream을 디버깅하기 위한 `X-UrgentDash-AI-Upstream` 헤더도 추가되었다.
+
+### 결과
+
+이제 `/api/state`는 "최신 lite 상태 + 해당 버전의 AI 분석"을 하나의 응답으로 제공한다.
+
+### 운영 의미
+
+대시보드는 더 이상 별도 AI 상태를 추측하지 않아도 되고, pointer 기준으로 일관된 state 묶음을 볼 수 있게 되었다.
+
+---
+
+## 5.5 Intel Feed staleness tracking 도입
+
+### 관련 커밋
+
+- `d125415` `fix: add staleness tracking to intel feed items`
+
+### 문제
+
+source probe는 웹페이지 내용이 그대로인 경우 동일한 summary를 반복 생성할 수 있다. 이런 항목이 계속 feed 상단에 보이면, 사용자는 "새로운 정보"와 "기존 내용의 반복 감지"를 구분하기 어렵다.
+
+### 백엔드 변경
+
+`src/iran_monitor/state_engine.py`에서 Intel Feed 각 항목에 아래 개념을 도입했다.
+
+- `status`
+  - `official`
+  - `fresh`
+  - `repeated`
+- `firstSeenTs`
+
+즉, 이전 feed에 존재하던 fingerprint를 다시 본 경우 단순히 다시 정렬하는 것이 아니라 "이미 본 신호"라는 정보를 유지하게 되었다.
+
+### 프런트 변경
+
+`react/src/components/tabs/IntelTab.jsx`에서 repeated 항목에 대해:
+
+- `변동없음` 배지 표시
+- 일정 시간이 지난 경우 `h`, `d` 단위 stale label 표시
+- 모든 항목이 repeated일 때 no-fresh 배너 표시
+
+### normalize 계층 변경
+
+`react/src/lib/normalize.js`는 Intel feed item에 대해 기본 `status: "fresh"`와 `firstSeenTs` 정규화를 처리하도록 보강되었다.
+
+### 의미
+
+이 작업으로 Intel Feed는 단순 뉴스 리스트가 아니라 "현재 새 변화가 있는지 / 없는지"를 판단하는 운영 신호 UI에 가까워졌다.
+
+---
+
+## 5.6 Vercel upstream mismatch 수정
+
+### 관련 커밋
+
+- `d4bf0be` `fix: pin vercel live proxy upstream`
+
+### 문제
+
+실제 대시보드 문제의 핵심 중 하나는 Vercel이 `macho715/iran_abu_dash`가 아니라 다른 저장소를 upstream으로 보고 있었다는 점이다. 즉, 프록시 코드 자체보다도 "어느 GitHub raw를 보고 있느냐"가 잘못 연결된 상태였다.
+
+### 코드 변경
+
+`react/api/_liveProxy.js`에서 운영 source를 코드 상수로 고정했다.
+
+- owner: `macho715`
+- repo: `iran_abu_dash`
+- branch: `urgentdash-live`
+
+더 이상 production source selection에 아래 env를 사용하지 않도록 했다.
+
+- `URGENTDASH_GITHUB_OWNER`
+- `URGENTDASH_GITHUB_REPO`
+- `URGENTDASH_PUBLISH_BRANCH`
+
+단, 값이 있으면 무시 사실을 경고 로그로 남기게 했다.
+
+### 헤더 추가
+
+응답 헤더에 아래 진단 정보가 들어가도록 했다.
+
+- `X-UrgentDash-Upstream`
+- `X-UrgentDash-Publish-Source: macho715/iran_abu_dash@urgentdash-live`
+- `X-UrgentDash-Proxy-Version: 2026-03-08-fixed-source`
+
+### 테스트 추가
+
+새 API 테스트가 대거 추가되었다.
+
+- `react/api/_liveProxy.test.js`
+- `react/api/live/latest.test.js`
+- `react/api/live/v/[version]/[artifact].test.js`
+- `react/api/state.test.js`
+
+테스트 범위는 다음을 포함한다.
+
+- fixed source가 항상 `iran_abu_dash/urgentdash-live`인지
+- env override가 있어도 production source가 바뀌지 않는지
+- `/api/state`가 lite+ai merge 경로를 유지하는지
+- versioned artifact proxy가 기대대로 동작하는지
+
+### 운영 조치
+
+코드 패치 외에도 실제 Vercel 프로젝트의 Git integration이 잘못된 저장소를 보고 있던 문제를 정리했다.
+
+함께 확인한 운영 기준은 다음과 같다.
+
+- production upstream은 `macho715/iran_abu_dash@urgentdash-live`
+- Vercel 프로젝트 Git integration은 `macho715/iran_abu_dash`
+- root directory는 `react`
+- `URGENTDASH_GITHUB_OWNER`, `URGENTDASH_GITHUB_REPO`, `URGENTDASH_PUBLISH_BRANCH`는 운영 source selection에 사용하지 않음
+
+초기에는 env override 오염 가능성도 의심했지만, 실제 직접 원인은 Git integration 오연결에 더 가까웠다.
+
+이후 공개 API는 현재도 다음 헤더를 정상 반환한다.
+
+- `X-UrgentDash-Publish-Source: macho715/iran_abu_dash@urgentdash-live`
+- `X-UrgentDash-Upstream: https://raw.githubusercontent.com/macho715/iran_abu_dash/urgentdash-live/live/latest.json`
+
+### 현재 기준 운영 확인
+
+문서 작성 시점 기준:
+
+- `https://react-pi-ivory.vercel.app/api/live/latest` 응답은 `200`
+- 캐시 정책은 `private, no-store, max-age=0, must-revalidate`
+- upstream 헤더는 `iran_abu_dash/urgentdash-live`를 가리킨다
+- proxy version은 `2026-03-08-fixed-source`
+
+---
+
+## 5.7 GitHub Actions freshness gate 제거
+
+### 관련 커밋
+
+- `7b67f48` `fix: refresh scheduled monitor runs`
+
+### 문제
+
+워크플로는 15분마다 실행되도록 되어 있었지만, 동시에 "최근 25분 이내 publish면 skip"하는 freshness gate가 존재했다. 그 결과 cron은 돌았지만 실제 publish가 자주 생략되었고, `latest.json`이 이전 버전에 머무는 일이 발생했다.
+
+### 변경 내용
+
+`.github/workflows/monitor.yml`에서 기존 freshness-based gate를 제거하고 unconditional refresh gate로 바꿨다.
+
+현재 gate 동작:
+
+- 항상 `should_run=true`
+- `workflow_dispatch`일 때 `skip_reason=manual`
+- `schedule`일 때 `skip_reason=scheduled_refresh`
+
+즉, 스케줄러는 이제 "해당 시각에 돌기로 되어 있으면 실제로 돈다".
+
+### 유지한 사항
+
+다음은 그대로 유지했다.
+
+- cron: `12,27,42,57 * * * *`
+- lite -> ai 구조
+- artifact upload
+- `urgentdash-live` publish branch
+
+### 결과
+
+scheduled run이 단지 짧게 끝나는 skip 패턴이 아니라, 실제 lite/ai publish를 수행하게 되었다.
+
+### 문서 동기화
+
+이 변경에 맞춰 `README.md`의 GitHub Actions 설명도 같이 고쳤다.
+
+- scheduled run은 매 사이클 refresh 수행
+- freshness-based skip 없음
+- `urgentdash-live/live/latest.json`이 공개 source of truth
+
+---
+
+## 5.8 Intel Feed 반복 분류 규칙 보정
+
+### 관련 커밋
+
+- `7b67f48` 안의 백엔드/테스트 변경
+
+### 문제
+
+반복된 공식 TIER0 시그널이 여전히 `official`처럼 보이면, 사용자는 "새 공식 발표"와 "기존 공식 내용 반복 감지"를 구분하기 어렵다.
+
+### 변경 내용
+
+`src/iran_monitor/state_engine.py`의 `_build_intel_feed()`를 다음 규칙으로 확정했다.
+
+1. 먼저 fingerprint를 계산
+2. 이전 feed에 있던 fingerprint면 곧바로 `repeated`
+3. 그렇지 않고 confirmed `TIER0 source_probe`면 `official`
+4. 그 외는 `fresh`
+
+그리고 정렬도 membership check가 아니라 명시적인 tuple 방식으로 바꿨다.
+
+- `[(row, "official", fp), (row, "fresh", fp), (row, "repeated", fp)]`
+
+`firstSeenTs`도 repeated면 이전 값을 유지하도록 했다.
+
+### 테스트
+
+`tests/test_state_engine.py`에서 다음을 잠갔다.
+
+- repeated official은 `official`이 아니라 `repeated`
+- 이전 `firstSeenTs`를 유지
+- 새로운 공식 시그널은 여전히 `official`
+- fresh item이 repeated item보다 앞선다
+
+### 결과
+
+이제 `official`은 "이번 사이클의 새로운 공식 신호"를 뜻하고, `repeated`는 "예전에 이미 본 신호"를 뜻한다.
+
+---
+
+## 5.9 DashboardHeader 개선
+
+### 관련 커밋
+
+- `7b67f48` 안의 프런트 변경
+
+### 변경 파일
+
+- `react/src/App.jsx`
+- `react/src/components/DashboardHeader.jsx`
+- `react/src/lib/constants.js`
+- `react/src/lib/deriveState.js`
+- 관련 테스트/fixture/type 파일
+
+### 변경 내용
+
+기존 헤더는 stale 여부를 대략적으로 보여줬지만, 사용자 입장에서 "정확히 얼마나 늦었는지"와 "원본 state timestamp / source health가 무엇인지"가 충분히 드러나지 않았다.
+
+그래서 다음 필드를 강화했다.
+
+- `liveLagMinutes`
+- `staleWarningVisible`
+- `stateTs`
+- `sourceHealthLabel`
+
+`DashboardHeader`는 현재 아래 형태로 정보를 보여준다.
+
+- stale banner: `데이터가 N분 전입니다`
+- 보조 정보: `latest poll every ... · live lag: ...`
+- 추가 하단 라인: `stateTs: ... · source health: X/Y ok`
+
+### 의미
+
+대시보드가 stale인지 아닌지만이 아니라, "왜 stale로 보이는지"와 "source health가 어떤지"를 운영자가 더 빠르게 확인할 수 있게 되었다.
+
+이 과정에서 `react/src/lib/constants.js`에 `DATA_REVALIDATION_POLICY`, `STALE_WARNING_BANNER_THRESHOLD_MINUTES` 같은 정책 상수도 추가해 polling/staleness 기준을 중앙화했다.
+
+---
+
+## 5.10 공용 상태 패널 컴포넌트 도입
+
+### 관련 커밋
+
+- `7b67f48`
+
+### 변경 파일
+
+- `react/src/components/TabStatePanel.jsx`
+- `react/src/components/TabStatePanel.test.jsx`
+
+### 목적
+
+탭별 상태 배너를 제각각 인라인 스타일로 만들면, 로딩/오류/no-fresh/empty 상태가 서로 다른 톤과 접근성 속성을 갖게 된다.
+
+### 구현
+
+`TabStatePanel`은 다음 variant를 제공한다.
+
+- `loading`
+- `error`
+- `empty`
+- `no-fresh`
+
+그리고 다음 속성을 표준화했다.
+
+- 기본 타이틀
+- 배경색/테두리/텍스트 색상
+- `role=status` 또는 `role=alert`
+- `aria-live`
+
+### 의미
+
+상태성 UI를 다른 탭에서도 재사용할 수 있는 기반이 생겼고, Intel 탭에도 이 컴포넌트를 적용했다.
+
+---
+
+## 5.11 Intel status 집계 유틸 도입
+
+### 관련 커밋
+
+- `7b67f48`
+
+### 변경 파일
+
+- `react/src/lib/intelStatus.js`
+- `react/src/lib/intelStatus.test.js`
+
+### 목적
+
+Intel Feed에서 `fresh`, `official`, `repeated` 계산이 화면마다 분산되면 회귀가 생기기 쉽다. 특히 `official`을 fresh로 볼 것인지 여부가 중요한 계약이었다.
+
+### 구현 내용
+
+`countIntelStatuses(feed)`는 다음을 계산한다.
+
+- `freshCount`
+- `repeatedCount`
+- `officialCount`
+- `hasFresh`
+
+여기서 핵심 규칙은 다음이다.
+
+- status가 없으면 기본 `fresh`
+- `official`은 fresh로 간주
+- `hasFresh = freshCount + officialCount > 0`
+
+### 결과
+
+Intel 탭이 잘못해서 `official-only` 상태를 "신규 시그널 없음"으로 오분류하지 않도록 막았다.
+
+---
+
+## 5.12 IntelTab 표시 규칙 정리
+
+### 관련 커밋
+
+- `7b67f48`
+
+### 현재 동작
+
+`react/src/components/tabs/IntelTab.jsx`는 아래 규칙으로 동작한다.
+
+1. `countIntelStatuses(allIntelFeed)`로 상태 집계
+2. `allRepeated = repeatedCount === allIntelFeed.length`
+3. 모든 항목이 repeated일 때만 no-fresh 배너 표시
+4. repeated 항목은 `변동없음` 배지와 경과 시간 표시
+5. `official`과 `fresh`가 하나라도 있으면 no-fresh 배너는 띄우지 않음
+
+### 이유
+
+이 규칙은 백엔드의 `official/fresh/repeated` 의미와 맞는다.
+
+- `official`: 새로운 공식 신호
+- `fresh`: 새로운 일반 신호
+- `repeated`: 예전에 이미 본 신호
+
+즉, repeated-only일 때만 "새로운 변화 없음"이라고 말할 수 있다.
+
+### 테스트
+
+`react/src/components/tabs/IntelTab.test.jsx`는 다음을 검증한다.
+
+- full feed count vs filtered list count
+- repeated-only 배너
+- repeated badge 표시
+- `official-only`에서는 배너가 나오지 않음
+- `official + repeated` 혼합일 때도 배너가 나오지 않음
+
+---
+
+## 5.13 긴급 판단 화면으로 `Simulator` 전환
+
+### 관련 커밋
+
+- `6776be7` `feat: refactor emergency decision simulator`
+
+### 변경 배경
+
+기존 `react/src/components/Simulator.jsx`는 아래 성격이 강했다.
+
+- `H0/H1/H2` 슬라이더 조절
+- `I01~I04` 슬라이더 조절
+- `evidenceConf`, `effectiveThreshold`, `deltaScore`, `egressLossETA` 직접 조절
+- trigger checkbox 직접 조절
+- raw route status/congestion/base_h 직접 조절
+
+이 방식은 내부 실험 도구로는 유용하지만, 실제 운영 상황에서 "지금 어떤 상황인지 선택하면 바로 무엇을 해야 하는가"를 보려는 목적에는 맞지 않았다.
+
+### 새로운 방향
+
+새 `Simulator`는 사실상 "긴급 판단" 탭으로 재정의되었다.
+
+입력은 raw 수치가 아니라 다음 의미 단위로 받는다.
+
+- 상황: `현재 유지`, `공습 징후`, `영공 폐쇄`, `국경 봉쇄`, `대사관 경보`, `부분 정상화`
+- 범위: `국지`, `광역`, `전면`
+- 시급도: `즉시`, `오늘 안`, `대기 가능`
+- 제약: `항공 불가`, `육로 불안`, `통신 불안`, `야간 회피`
+- 선택적 경로 quick edit
+
+### 내부 구조
+
+구조 자체는 기존 원칙을 유지한다.
+
+1. `liveDash`를 받아 base sim을 생성
+2. UI 선택값을 preset/override로 적용
+3. simulated dashboard를 다시 구성
+4. `normalizeDashboard()` 통과
+5. `deriveState()`로 최종 판단 재계산
+
+즉, 계산 엔진은 그대로 두고 입력 인터페이스를 운영형으로 바꾼 것이다.
+
+### 주요 세부 기능
+
+#### 1) 상황 선택 기반 preset
+
+각 scenario는 여러 내부 state를 한 번에 조정한다.
+
+예:
+
+- `공습 징후`: `I03`, `H1`, `H2`, `strike_detected`, `red_imminent`, route congestion 증가
+- `영공 폐쇄`: `I02` 상승, degraded 표시, 항공 제외 가정
+- `국경 봉쇄`: `I04`, `border_change`, 일부 route를 `BLOCKED/CAUTION`
+- `대사관 경보`: `I01`, `kr_leave_immediately`
+- `부분 정상화`: 각 지표를 낮추고 trigger를 false로 복귀
+
+#### 2) 행동 권고 요약
+
+상단 카드에서 다음을 한 번에 보여준다.
+
+- `action.title`
+- `action.detail`
+- `action.reason`
+
+이 카드의 톤은 `danger / warning / success`로 나뉘며 색상도 함께 달라진다.
+
+#### 3) 추천 경로 정렬
+
+`getRouteEffectiveHours(route, ROUTE_BUFFER_FACTOR)`를 사용해 사용 가능한 route를 정렬한다.
+
+- `BLOCKED`는 제외 또는 후순위
+- ETA 기준으로 정렬
+- baseline 대비 시간 변화 표시
+- 최적 route는 `권장` 배지 표시
+
+#### 4) 경로 quick edit
+
+사용자가 필요할 때만 열 수 있는 접힌 섹션으로 두었다.
+
+각 route에 대해:
+
+- `정상`
+- `주의`
+- `폐쇄`
+- `+1h`
+- `초기화`
+
+만 제공한다.
+
+즉, 과거처럼 raw `cong` slider를 계속 만지는 구조는 제거하고, 운영자가 빨리 의사결정 가정만 넣을 수 있도록 축소했다.
+
+#### 5) 자동 timeline logging
+
+기존 수동 `Log to timeline` 버튼은 제거했다.
+
+대신 다음 조건에서만 자동으로 `SIM` 이벤트를 남긴다.
+
+- 사용자가 실제 선택을 했을 때
+- 결과 판단이 바뀌었을 때
+- 동일한 선택/동일한 결과는 signature dedupe로 중복 기록하지 않을 때
+
+이벤트 형태는 다음과 같다.
+
+- `category: "SIM"`
+- `title: 긴급 판단 갱신 · ...`
+- `detail: 선택 요약 | 권고 상세 | 이유: ...`
+
+### UI 문구 변경
+
+탭 이름도 `Simulator`에서 `긴급 판단`으로 변경했다.
+
+현재 탭 정의:
+
+- `id: "sim"`
+- `label: "긴급 판단"`
+- `icon: "🚨"`
+
+### 사용자 체감 변화
+
+이 변경으로 사용자는 더 이상 내부 계산 파라미터를 이해하지 않아도 된다.
+대신 아래 흐름으로 사용하게 된다.
+
+1. 상황 고르기
+2. 범위/시급도/제약 추가
+3. 추천 경로와 즉시 권고 확인
+4. 필요하면 route quick edit로 소폭 보정
+
+즉, 실험용 패널에서 운영 판단 패널로 성격이 바뀌었다.
+
+### 테스트 추가
+
+이 리팩터와 함께 다음 테스트가 추가 또는 강화되었다.
+
+- `react/src/components/Simulator.test.jsx`
+- `react/src/hooks/useDashboardData.test.jsx`
+
+검증 범위는 baseline 렌더링, scenario 변경, reset, route quick edit, timeline dedupe, 탭 라벨 회귀를 포함한다.
+
+---
+
+## 6. 파일별 주요 변경 정리
+
+아래는 중요 파일별 요약이다.
+
+### 6.1 API / 배포 경로
+
+- `react/api/_liveProxy.js`
+  - fixed upstream source 고정
+  - env override 무시 및 경고
+  - no-store 계열 캐시 제어
+  - 진단 헤더 추가
+
+- `react/api/state.js`
+  - `latest.json` 기준 lite/ai artifact 병합
+  - legacy fallback 유지
+  - `X-UrgentDash-State-Mode` 헤더 제공
+
+- `.github/workflows/monitor.yml`
+  - freshness gate 제거
+  - scheduled run 강제 refresh
+
+### 6.2 백엔드 상태 엔진
+
+- `src/iran_monitor/state_engine.py`
+  - Intel feed status 분류 강화
+  - repeated 우선 분류
+  - `firstSeenTs` 유지
+
+- `tests/test_state_engine.py`
+  - fresh/repeated 우선순위 테스트
+  - repeated official regression test
+
+### 6.3 프런트 상태/가시성
+
+- `react/src/lib/deriveState.js`
+  - `liveLagMinutes`
+  - `staleWarningVisible`
+  - `sourceHealthLabel`
+
+- `react/src/lib/constants.js`
+  - `DATA_REVALIDATION_POLICY`
+  - `STALE_WARNING_BANNER_THRESHOLD_MINUTES`
+
+- `react/src/components/DashboardHeader.jsx`
+  - stale banner 조건 개선
+  - `stateTs`, `source health` 표시
+
+- `react/src/components/TabStatePanel.jsx`
+  - 상태 패널 공용화
+
+- `react/src/lib/intelStatus.js`
+  - Intel status 집계 유틸
+
+- `react/src/lib/normalize.js`
+  - Intel feed item `status`(fresh/official/repeated), `firstSeenTs` 정규화
+
+- `react/src/components/tabs/IntelTab.jsx`
+  - repeated-only no-fresh 배너
+  - stale badge 표시
+
+- `react/src/test/fixtures.js`
+  - `createHealthyDashboard()`
+  - `createStaleDashboard()`
+  - 헤더 및 stale 테스트용 fixture 보강
+
+- `react/src/types/dashboard.ts`
+  - `liveLagMinutes`
+  - `staleWarningVisible`
+  - `sourceHealthLabel`
+  - 현재 derived state 필드에 맞춘 타입 보강
+
+### 6.4 의사결정 UI
+
+- `react/src/components/Simulator.jsx`
+  - raw slider editor 제거
+  - 긴급 판단 UI 도입
+  - 자동 timeline logging
+
+- `react/src/hooks/useDashboardData.js`
+  - 탭 라벨 `긴급 판단`
+  - `DATA_REVALIDATION_POLICY` 기반 polling 사용
+  - 기타 기존 polling/derived 연결 유지
+
+### 6.5 문서 및 운영 규칙 동기화
+
+- `README.md`
+  - canonical frontend가 `react/`임을 재명시
+  - scheduler 규칙 갱신
+  - production upstream 고정 규칙 문서화
+  - Vercel root directory와 Git integration 원칙 문서화
+
+- `LAYOUT.md`, `COMPONENTS.md`, `의존성.md`, `patchplan.md`, `SYSTEM_ARCHITECTURE.md`
+  - 이번 업데이트 계획 실행으로 탭 구조, 긴급 판단 UI, GHA, /api/state 경로, 관련 Mermaid 다이어그램 동기화
+
+---
+
+## 7. 테스트 및 검증 기록
+
+## 7.1 프런트엔드 테스트
+
+문서 작성 전후 작업에서 아래 검증을 수행했다.
+
+- `npm test`
+- `npm run typecheck`
+- `npm run build`
+
+최종 React 검증 결과:
+
+- Test Files: `22 passed`
+- Tests: `51 passed`
+
+특히 아래 테스트가 신규 또는 강화되었다.
+
+- `_liveProxy` 계열 API 테스트
+- `state.js` merge 테스트
+- `IntelTab` repeated/offical/fresh 테스트
+- `intelStatus` 유틸 테스트
+- `TabStatePanel` 테스트
+- `DashboardHeader` stale/offline 테스트
+- `deriveState` staleWarningVisible 테스트
+- `Simulator` 신규 테스트
+- `useDashboardData`의 sim 탭 라벨 테스트
+
+## 7.2 백엔드 테스트
+
+이전 단계에서 Python 쪽도 검증했다.
+
+- `python -m pytest -q tests/test_live_publish.py`
+- `python -m pytest -q`
+
+당시 전체 결과는 `21 passed`였다.
+
+즉, scheduler/publish 경로와 state engine 테스트도 깨지지 않는 범위에서 변경을 정리했다.
+
+## 7.3 운영 배포 검증
+
+### GitHub
+
+현재 `main`의 최신 반영 커밋:
+
+- `6776be7` `feat: refactor emergency decision simulator`
+- 그 직전 운영 안정화 커밋:
+  - `d4bf0be` `fix: pin vercel live proxy upstream`
+  - `7b67f48` `fix: refresh scheduled monitor runs`
+
+### Vercel
+
+문서 작성 시점 기준 GitHub commit status:
+
+- `Vercel – react`: `success`
+- `Vercel – iran-abu-dash`: `success`
+
+### 공개 HTML 확인
+
+공개 도메인 HTML은 현재 새 번들을 참조한다.
+
+- JS asset: `index-cvtcUEid.js`
+
+그리고 번들 내부 문자열 확인 결과:
+
+- `긴급 판단`: 존재
+- `공습 징후`: 존재
+- `현재 기준으로 되돌리기`: 존재
+- `Simulator snapshot logged`: 없음
+
+즉, 긴급 판단 리팩터가 실제 배포 번들에 들어갔음을 확인했다.
+
+### 공개 API 확인
+
+`https://react-pi-ivory.vercel.app/api/live/latest` 헤더 확인 결과:
+
+- `cache-control: private, no-store, max-age=0, must-revalidate`
+- `x-urgentdash-proxy-version: 2026-03-08-fixed-source`
+- `x-urgentdash-publish-source: macho715/iran_abu_dash@urgentdash-live`
+- `x-urgentdash-upstream: https://raw.githubusercontent.com/macho715/iran_abu_dash/urgentdash-live/live/latest.json`
+
+응답 본문 기준 latest pointer 예시:
+
+- `version: 2026-03-08T19-04-58Z`
+- `collectedAt: 2026-03-08T19:04:58Z`
+- `aiUpdatedAt: 2026-03-08T23:05:27+04:00`
+
+즉, 운영 경로는 현재도 `urgentdash-live` 최신 포인터를 따라가고 있다.
+
+## 7.4 수동 뉴스 갱신 및 반영 확인
+
+이번 작업 과정에서는 단순 배포 성공 여부만 본 것이 아니라, 실제 뉴스 업데이트가 운영 대시보드까지 도달하는지도 확인했다.
+
+확인 흐름은 다음과 같았다.
+
+1. GitHub Actions를 수동 실행해 lite/ai publish를 발생시킴
+2. `urgentdash-live/live/latest.json`의 `version`, `collectedAt` 변화 확인
+3. Raw latest pointer와 Vercel `/api/live/latest`의 일치 여부 확인
+4. `/api/state`의 Intel Feed 선두 항목이 새 run 기준 데이터로 바뀌는지 확인
+
+이 검증은 "코드가 맞게 보인다" 수준이 아니라, 실시간 뉴스/상태 갱신이 실제 운영 대시보드까지 흘러가는지를 확인한 단계였다.
+
+---
+
+## 8. 사용자 관점에서 달라진 점
+
+이번 변경으로 일반 사용자/운영자가 체감하는 변화는 아래와 같다.
+
+### 8.1 최신성 신뢰도 향상
+
+- scheduled run이 실제로 refresh되므로 업데이트가 더 꾸준히 반영된다
+- `/api/state`가 latest pointer 기준으로 동작한다
+- Vercel이 잘못된 저장소를 보지 않는다
+
+### 8.2 Intel Feed 해석성 향상
+
+- 반복 뉴스는 `변동없음`으로 보인다
+- 새 신호와 반복 신호가 구분된다
+- repeated-only인 경우에만 no-fresh 상태가 표시된다
+
+### 8.3 운영 가시성 향상
+
+- stale 배너가 더 정확하게 보인다
+- `stateTs`와 `source health`가 헤더에 보인다
+- source 문제인지 stale 문제인지 구분이 쉬워졌다
+
+### 8.4 행동 권고 UX 개선
+
+- 기존 실험용 시뮬레이터가 운영형 긴급 판단 도구로 바뀌었다
+- 사용자는 수치를 직접 만지지 않아도 된다
+- 상황 선택만으로 즉시 권고와 추천 경로를 볼 수 있다
+
+### 8.5 운영 추적성 향상
+
+- API 응답만 봐도 현재 upstream과 publish source를 알 수 있다
+- AI merge 경로인지 legacy fallback인지 헤더로 추적할 수 있다
+- GitHub commit status 기준으로 Vercel 배포 완료 여부를 바로 확인할 수 있다
+
+---
+
+## 9. 설계적으로 중요한 해석 규칙
+
+이번 작업에서 코드 구조상 중요한 의미 규칙은 다음과 같다.
+
+### 9.1 Intel Feed status 의미
+
+- `official`: 이번 사이클의 새로운 공식 신호
+- `fresh`: 이번 사이클의 새로운 비공식/일반 신호
+- `repeated`: 이전에 이미 본 신호
+
+이 규칙 때문에 `official`은 계속 fresh 계열로 간주한다.
+
+### 9.2 no-fresh 배너 의미
+
+no-fresh 배너는 "새 신호가 전혀 없다"는 뜻이어야 한다.
+따라서 repeated-only일 때만 보여야 하고, official-only나 official+repeated 상태에서는 보여주면 안 된다.
+
+### 9.3 상태 API 의미
+
+`/api/state`는 더 이상 단일 파일을 그대로 읽는 API가 아니다.
+Vercel `react/api/state.js`에서 다음을 수행하는 합성 API로 구현된다:
+
+1. latest pointer 해석
+2. lite state fetch
+3. ai state fetch
+4. 결과 merge
+
+### 9.4 긴급 판단 화면 의미
+
+새 `긴급 판단` 탭은 raw model tuning UI가 아니라:
+
+- 상황 입력
+- 제약 입력
+- 즉시 행동 권고
+- 추천 경로 비교
+
+를 위한 decision interface다.
+
+---
+
+## 10. 남아 있는 운영상 주의점
+
+이번 변경으로 큰 축은 정리됐지만, 운영상 아래 항목은 계속 볼 필요가 있다.
+
+### 10.1 source health 자체는 여전히 변동 가능
+
+현재 latest pointer에도 일부 source는 timeout, 404, non-2xx 상태가 남아 있다.
+이는 프록시 문제와는 별개의 외부 source 상태 문제다.
+
+예:
+
+- Etihad timeout
+- UAE GCAA timeout
+- KR MOFA 0404 404
+- UAE Ministry of Defence 404
+
+즉, 시스템은 이 상태를 더 잘 보여주게 되었지만, source 자체 품질 문제는 별도 운영 과제다.
+
+### 10.2 Raw CDN 캐시 지연 가능성
+
+과거에도 `raw.githubusercontent.com`의 캐시 지연 때문에 `latest.json` 반영이 몇 분 늦게 보이는 경우가 있었다.
+현재 프록시는 no-store 전략을 강하게 쓰고 있지만, 외부 raw CDN 레이어 특성상 "즉시 0초 반영"까지 보장되는 것은 아니다.
+
+### 10.3 긴급 판단 preset은 휴리스틱이다
+
+새 `Simulator`는 운영 UI로 바뀌었지만, 내부적으로는 여전히 휴리스틱 preset을 `deriveState()`에 적용하는 방식이다.
+즉, "상황 선택 = 실제 세계 모델링"이 아니라 "현재 대시보드 판단 엔진에 대한 빠른 what-if 입력"이라는 점은 유지된다.
+
+### 10.4 외부 소스 계약 변경 위험
+
+현재도 일부 source는 404 또는 timeout을 반환한다.
+이는 source 사이트 구조 변경, anti-bot, URL 이동, 응답 지연 같은 외부 요인에 의해 다시 발생할 수 있다.
+
+즉, 이번 작업은 표시/추적/분류를 개선한 것이고, source adapter 유지보수 필요성 자체가 사라진 것은 아니다.
+
+---
+
+## 11. 이번 작업의 가장 큰 성과
+
+이번 작업 묶음의 핵심 성과를 한 줄씩 정리하면 다음과 같다.
+
+1. 운영 데이터가 어디서 오는지 고정했다
+2. scheduled run이 실제로 publish되게 했다
+3. Intel Feed에서 새 정보와 반복 정보를 구분하게 했다
+4. stale/source 상태를 헤더에서 더 정확히 보이게 했다
+5. 실험용 `Simulator`를 행동 중심 `긴급 판단` UI로 바꿨다
+6. GitHub와 Vercel 배포 경로를 다시 일치시켰다
+
+이 여섯 가지가 함께 맞물리면서, 대시보드는 이제 다음 질문에 더 직접 답할 수 있게 되었다.
+
+- 지금 데이터가 최신인가?
+- 지금 새 신호가 들어왔는가?
+- 지금 상태는 얼마나 위험한가?
+- 지금 어떤 경로를 우선 봐야 하는가?
+- 지금 무엇을 해야 하는가?
+
+---
+
+## 12. 문서 작성 시점 기준 참고 값
+
+아래 값은 문서 작성 시점의 운영 확인 결과다.
+
+- GitHub `main` HEAD: `6776be7`
+- 주요 반영 커밋: `d4bf0be`, `7b67f48`, `6776be7`
+- Vercel URL: `https://react-pi-ivory.vercel.app/`
+- `/api/live/latest` upstream:
+  `https://raw.githubusercontent.com/macho715/iran_abu_dash/urgentdash-live/live/latest.json`
+- publish source:
+  `macho715/iran_abu_dash@urgentdash-live`
+- latest pointer version:
+  `2026-03-08T19-04-58Z`
+- commit status:
+  - `Vercel – react`: `success`
+  - `Vercel – iran-abu-dash`: `success`
+
+### 이 문서에 포함한 작업 범위
+
+이 문서는 마지막 UI 변경만 설명하는 문서가 아니다.
+아래 작업을 하나의 연속 변경 흐름으로 묶어 설명한다.
+
+- live proxy no-store 안정화
+- latest pointer 기준 state 해석
+- lite/ai merge
+- Intel staleness tracking
+- Vercel upstream 고정
+- scheduler freshness gate 제거
+- 헤더/상태 가시성 개선
+- Intel 반복 상태 표시 개선
+- 긴급 판단 UI 리팩터
+- GitHub/Vercel 배포 및 운영 경로 검증
+
+이 값들은 운영 시간이 지나면 달라질 수 있지만, 문서 작성 시점의 상태를 재현하는 기준점으로는 충분하다.
+
+---
+
+## 13. 결론
+
+이번 작업은 단순히 UI를 바꾼 것이 아니다.
+실제로는 다음 세 층을 함께 정리한 작업이었다.
+
+### 13.1 데이터 경로
+
+- live/latest pointer
+- lite/ai state merge
+- Vercel upstream 고정
+- no-store proxy
+
+### 13.2 상태 해석 경로
+
+- repeated signal 추적
+- firstSeenTs 보존
+- stale/source health 표시
+- repeated-only no-fresh 규칙 확정
+
+### 13.3 사용자 행동 경로
+
+- raw simulator 제거
+- 긴급 판단 UX 도입
+- 추천 경로와 즉시 행동 권고 제공
+- 자동 timeline logging
+
+따라서 이번 변경은 "운영 데이터를 더 정확히 전달하고, 그 데이터를 사람이 더 빠르게 해석하고, 바로 행동으로 연결할 수 있게 만드는" 방향의 정리 작업으로 보는 것이 맞다.

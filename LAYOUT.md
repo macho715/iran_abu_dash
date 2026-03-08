@@ -52,10 +52,10 @@ HyIE ERC² 대시보드 UI 레이아웃 및 컴포넌트 구성.
 |----|------|--------|------|
 | overview | Overview | 📊 | 요약, 가설, 루트 요약 |
 | analysis | Trends & Log | 📈 | 차트, 타임라인 |
-| intel | Intel Feed | 🔴 | 인텔 피드 |
+| intel | Intel Feed | 🔴 | 인텔 피드 (official→fresh→repeated 정렬, repeated-only 시 no-fresh 배너) |
 | indicators | Indicators | 📡 | 지표 I01~I07 |
 | routes | Routes | 🗺️ | 루트 맵, 상세 |
-| sim | Simulator | 🧪 | 시뮬레이터 |
+| sim | 긴급 판단 | 🚨 | 상황 선택 기반 즉시 권고·추천 경로 |
 | checklist | Checklist | ✅ | 대피 체크리스트 |
 
 ---
@@ -66,21 +66,21 @@ HyIE ERC² 대시보드 UI 레이아웃 및 컴포넌트 구성.
 
 ```mermaid
 graph LR
-    App["App.jsx"] --> OV["Overview"]
-    App --> AN["Analysis"]
-    App --> IF["Intel Feed"]
-    App --> ID["Indicators"]
-    App --> RT["Routes"]
-    App --> SM["Simulator"]
-    App --> CL["Checklist"]
+    App[App.jsx] --> OV[Overview]
+    App --> AN[Analysis]
+    App --> IF[Intel Feed]
+    App --> ID[Indicators]
+    App --> RT[Routes]
+    App --> ED[긴급 판단]
+    App --> CL[Checklist]
 
-    OV --> G["Gauge"]
-    OV --> CS["Conflict Stats"]
-    OV --> H["Hypotheses"]
-    AN --> MLC["MultiLineChart"]
-    AN --> TP["TimelinePanel"]
-    RT --> RML["RouteMapLeaflet"]
-    SM --> Sim["Simulator"]
+    OV --> G[Gauge]
+    OV --> CS[Conflict Stats]
+    OV --> H[Hypotheses]
+    AN --> MLC[MultiLineChart]
+    AN --> TP[TimelinePanel]
+    RT --> RML[RouteMapLeaflet]
+    ED --> Sim[Simulator]
 ```
 
 ### 3.2 Overview 섹션 그리드
@@ -102,6 +102,42 @@ flowchart TD
     Row1 --> Row2 --> Row3
 ```
 
+### 3.3 긴급 판단 UI 흐름
+
+```mermaid
+flowchart TD
+    subgraph Input[입력]
+        Scenario[상황 선택]
+        Scope[범위]
+        Urgency[시급도]
+        Constraint[제약]
+        RouteEdit[Route quick edit]
+    end
+
+    subgraph Process[처리]
+        Preset[applyScenarioPreset]
+        Build[buildDashFromSim]
+        Derive[deriveState]
+    end
+
+    subgraph Output[출력]
+        Action[행동 권고 카드]
+        Routes[추천 경로 정렬]
+        Timeline[자동 SIM 이벤트]
+    end
+
+    Scenario --> Preset
+    Scope --> Preset
+    Urgency --> Preset
+    Constraint --> Preset
+    RouteEdit --> Build
+    Preset --> Build
+    Build --> Derive
+    Derive --> Action
+    Derive --> Routes
+    Derive -->|선택 변경 시| Timeline
+```
+
 ---
 
 ## 4. 섹션별 레이아웃
@@ -111,6 +147,9 @@ flowchart TD
 - `display: flex`, `justify-content: space-between`, `flex-wrap: wrap`
 - 좌측: 제목, GST, last fetch, full sync 정보
 - 우측: Pill (MODE, Gate, I02), Refresh 버튼, 알림/사운드 토글
+- stale 시 배너: `데이터가 N분 전입니다` (liveLagMinutes 기반)
+- 보조 정보: `latest poll every ... · live lag: ...`
+- 추가 하단 라인: `stateTs: ... · source health: X/Y ok`
 - 오프라인 시: 캐시 사용 배너 표시
 
 ### 4.2 Overview 탭
@@ -124,19 +163,37 @@ flowchart TD
 | Hypotheses | `repeat(auto-fit, minmax(260px, 1fr))` | H0, H1, H2 |
 | ΔScore / EvidenceConf trend | `grid 1fr 1fr` | 스파크라인 |
 
-### 4.3 Routes 탭
+### 4.3 Analysis 탭
+
+- `grid 1fr 1fr`: MultiLineChart / Sparkline (ΔScore, EC)
+- HistoryPlayback: 시점 선택, diff 비교
+- TimelinePanel: 이벤트 로그, Clear/Export
+
+### 4.4 Routes 탭
 
 - 2열: `grid 1.15fr 0.85fr`
 - 좌: Route Map (SVG 또는 Leaflet)
 - 우: Route 상세 카드 (status, base_h, congestion, effective_h, newsRefs)
 
-### 4.4 Simulator 탭
+### 4.5 Intel 탭
+
+- Card + filter row (ALL/CRITICAL/HIGH/MEDIUM)
+- TabStatePanel (no-fresh, allRepeated 시)
+- Intel 카드 목록, 정렬: official → fresh → repeated
+- repeated: 변동없음 배지, stale label (h/d)
+
+### 4.6 긴급 판단 탭 (Simulator)
 
 - `grid 1.15fr 0.85fr`
-- 좌: 파라미터 (routes, congestion, base_h, buffer)
-- 우: 결과 (effective 시간, 선택 루트)
+- 좌: 상황 선택 (현재 유지/공습 징후/영공 폐쇄/국경 봉쇄/대사관 경보/부분 정상화), 범위 (국지/광역/전면), 시급도 (즉시/오늘 안/대기 가능), 제약 (항공 불가 등), Route quick edit (접힌 섹션)
+- 우: 행동 권고 카드 (action.title/detail/reason, tone: danger/warning/success), 추천 경로 정렬 (권장 배지, ETA, baseline 대비)
 
-### 4.5 Checklist 탭
+### 4.7 Indicators 탭
+
+- Indicator 카드: `repeat(auto-fit, minmax(...))` 그리드
+- Evidence Floor: derived 기반
+
+### 4.8 Checklist 탭
 
 - `flex flexDirection: column`, gap 8
 - 체크박스 리스트: id, text, done
@@ -241,32 +298,37 @@ flowchart TD
 | Export 버튼 | color `#e2e8f0` |
 | 버튼 공통 | background `#0b1220`, border `1px solid #1e293b`, borderRadius 10, padding 8 12, fontSize 11, fontWeight 700 |
 
-### 5.9 Simulator (Simulator.jsx)
+### 5.9 TabStatePanel (TabStatePanel.jsx)
+
+| 속성 | 값 |
+|------|-----|
+| variant | loading, error, empty, no-fresh |
+| role | status 또는 alert |
+| aria-live | polite 또는 assertive |
+
+### 5.10 긴급 판단 (Simulator.jsx)
 
 | 속성 | 값 |
 |------|-----|
 | 레이아웃 | grid 1.15fr 0.85fr, gap 10 |
-| 제목 | fontSize 13, fontWeight 900 |
-| 서브텍스트 | fontSize 10, color `#64748b`, marginTop 4 |
+| 입력 | 상황/범위/시급도/제약 선택 (슬라이더 제거) |
+| 출력 | 행동 권고 카드 (danger/warning/success), 추천 경로 목록 |
 | 패널 배경 | `#0b1220`, border `1px solid #1e293b`, borderRadius 12, padding 12 |
-| 가설 슬라이더 | marginTop 10, label fontSize 11, value monospace |
-| H0 색상 | `#22c55e` |
-| H1 색상 | `#f59e0b` |
-| H2 색상 | `#ef4444` |
-| Log 버튼 | background `#0b1220`, border `1px solid #1e293b`, padding 10 12, fontSize 11, fontWeight 900 |
-| Route 테이블 | gridTemplateColumns `60px 1fr 1fr 1fr`, gap 8 |
+| Route quick edit | 정상/주의/폐쇄/+1h/초기화 (접힌 섹션) |
+| Log | 자동 timeline logging (수동 버튼 제거) |
 
-### 5.10 헤더 (DashboardHeader.jsx)
+### 5.11 헤더 (DashboardHeader.jsx)
 
 | 요소 | fontSize | fontWeight | color |
 |------|----------|------------|-------|
 | 제목 | 18 | 900 | (기본) |
 | GST 행 | 11 | - | `#94a3b8` |
 | full sync 행 | 10 | - | STALE 시 `#f59e0b`, else `#64748b` |
+| stateTs, source health | 10 | - | `#94a3b8` |
 | Refresh 버튼 | 11 | 900 | `#e2e8f0` |
 | 에러 박스 | 11 | - | `#fca5a5` |
 
-### 5.11 탭 버튼 (TabBar.jsx)
+### 5.12 탭 버튼 (TabBar.jsx)
 
 | 상태 | background | border | color |
 |------|------------|--------|-------|
@@ -274,7 +336,7 @@ flowchart TD
 | inactive | `#0b1220` | `1px solid #1e293b` | `#94a3b8` |
 | 공통 | padding 10 12, borderRadius 12, fontSize 12, fontWeight 900, gap 8 |
 
-### 5.12 Overview 블록별
+### 5.13 Overview 블록별
 
 | 블록 | fontSize | 기타 |
 |------|----------|------|
@@ -303,7 +365,9 @@ flowchart TD
 | MultiLineChart, Sparkline | `react/src/components/charts.jsx` | 차트 |
 | RouteMapLeaflet | `react/src/components/RouteMapLeaflet.jsx` | 지도 Leaflet |
 | TimelinePanel | `react/src/components/TimelinePanel.jsx` | 타임라인 로그 |
-| Simulator | `react/src/components/Simulator.jsx` | 시뮬레이터 |
+| Simulator | `react/src/components/Simulator.jsx` | 긴급 판단: 상황 선택 기반 즉시 권고·추천 경로 |
+| TabStatePanel | `react/src/components/TabStatePanel.jsx` | 로딩/에러/empty/no-fresh 배너 |
+| intelStatus | `react/src/lib/intelStatus.js` | countIntelStatuses(feed) |
 
 ---
 
@@ -377,6 +441,9 @@ flowchart TD
 
 ## 9. 관련 문서
 
+- [README.md](./README.md)
+- [Iran Abu Dash 운영 안정화 및 긴급 판단 UI 개편 종합 문서](./Iran%20Abu%20Dash%20운영%20안정화%20및%20긴급%20판단%20UI%20개편%20종합%20문서.md)
 - [COMPONENTS.md](./COMPONENTS.md)
 - [SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md)
 - [의존성.md](./의존성.md)
+- [patchplan.md](./patchplan.md)

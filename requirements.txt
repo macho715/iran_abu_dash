@@ -1,8 +1,8 @@
+# Python deps. After pip install: playwright install chromium (GHA/로컬 scrapers용)
 playwright
 apscheduler
 python-telegram-bot
 structlog
-polars
 python-dotenv
 tenacity
 notebooklm-mcp-cli

@@ -54,9 +54,9 @@ live/
 
 - `GET /api/live/latest`
 - `GET /api/live/v/{version}/{artifact}`
-- `GET /api/state`
-  - `live/hyie_state.json` 우선
-  - 없으면 `state/hyie_state.json` fallback
+- `GET /api/state` (Vercel `react/api/state.js`)
+  - `latest.json` 포인터 → lite+ai artifact 병합 합성 payload
+  - upstream 없을 때 legacy fallback
 - `GET /health`
   - `last_lite_success_at`
   - `last_ai_success_at`
@@ -76,8 +76,8 @@ live/
 
 ### 5. GitHub Actions
 
-- cron: `7,22,37,52 * * * *`
-- freshness gate: 마지막 `collectedAt`가 25분 이내면 skip
+- cron: `12,27,42,57 * * * *`
+- Gate: scheduled run은 매 사이클 refresh, freshness-based skip 없음
 - `lite` job
   - bundle 생성
   - `urgentdash-live` 즉시 publish
