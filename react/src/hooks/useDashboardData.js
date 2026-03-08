@@ -42,7 +42,7 @@ const TABS = [
   { id: "intel", label: "Intel Feed", icon: "🔴" },
   { id: "indicators", label: "Indicators", icon: "📡" },
   { id: "routes", label: "Routes", icon: "🗺️" },
-  { id: "sim", label: "Simulator", icon: "🧪" },
+  { id: "sim", label: "긴급 판단", icon: "🚨" },
   { id: "checklist", label: "Checklist", icon: "✅" }
 ];
 

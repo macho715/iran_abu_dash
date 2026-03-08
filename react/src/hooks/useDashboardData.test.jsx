@@ -102,4 +102,16 @@ describe("useDashboardData", () => {
 
     unmount();
   });
+
+  it("exposes the emergency decision tab label", () => {
+    const { result, unmount } = renderHook(() => useDashboardData());
+
+    expect(result.current.tabs.find((tab) => tab.id === "sim")).toEqual({
+      id: "sim",
+      label: "긴급 판단",
+      icon: "🚨",
+    });
+
+    unmount();
+  });
 });
