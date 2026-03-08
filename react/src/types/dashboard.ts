@@ -114,8 +114,10 @@ export interface DerivedState {
   evidenceFloorPassed: boolean;
   urgencyScore: number;
   liveLagSeconds: number | null;
+  liveLagMinutes: number | null;
   liveStale: boolean;
   staleSeverity: "UNKNOWN" | "FRESH" | "STALE" | "SEVERE" | "CRITICAL";
+  staleWarningVisible: boolean;
   sourceHealthLabel: string;
   liveSource: string;
   leadingHypothesis: Hypothesis;

@@ -2,6 +2,8 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { deriveState } from "../lib/deriveState.js";
+import { createHealthyDashboard, createStaleDashboard } from "../test/fixtures.js";
 import DashboardHeader from "./DashboardHeader.jsx";
 
 describe("DashboardHeader", () => {
@@ -13,16 +15,9 @@ describe("DashboardHeader", () => {
 
     render(
       <DashboardHeader
-        derived={{
-          staleSeverity: "SEVERE",
-          liveLagSeconds: 3900,
-          liveStale: true,
-          modeState: "RED_PREP",
-          modeColor: "#f59e0b",
-          gateState: "CAUTION",
-          airspaceState: "DISRUPTED",
-          airspaceSegment: "DISRUPTED"
-        }}
+        derived={deriveState(createStaleDashboard({
+          metadata: { stateTs: new Date(Date.now() - (65 * 60 * 1000)).toISOString() },
+        }))}
         error="Pointer fallback active"
         gstDateTime="2026. 3. 6. 16:00:00"
         updateTs="16:00"
@@ -38,11 +33,16 @@ describe("DashboardHeader", () => {
         usingCachedData
         cachedAt="2026-03-06T11:59:00Z"
         isOffline
+        stateTs="2026-03-06T11:55:00Z"
+        sourceHealthLabel="2/6 ok"
       />
     );
 
     expect(screen.getByText(/OFFLINE/i)).toBeInTheDocument();
     expect(screen.getByText(/cached data from/i)).toBeInTheDocument();
+    expect(screen.getByText(/데이터가 65분 전/i)).toBeInTheDocument();
+    expect(screen.getByText(/stateTs: 2026-03-06T11:55:00Z/i)).toBeInTheDocument();
+    expect(screen.getByText(/source health: 2\/6 ok/i)).toBeInTheDocument();
     expect(screen.getByText(/Pointer fallback active/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole("button", { name: /Refresh Now|🔄 Refresh/i })[0]);
@@ -54,5 +54,34 @@ describe("DashboardHeader", () => {
     expect(onToggleNotifications).toHaveBeenCalled();
     expect(onToggleSound).toHaveBeenCalled();
     expect(onToggleShortcuts).toHaveBeenCalled();
+  });
+
+  it("does not render stale warning banner for healthy data", () => {
+    render(
+      <DashboardHeader
+        derived={deriveState(createHealthyDashboard({
+          metadata: { stateTs: new Date(Date.now() - (4 * 60 * 1000)).toISOString() },
+        }))}
+        error={null}
+        gstDateTime="2026. 3. 6. 16:00:00"
+        updateTs="16:00"
+        nextEta={30}
+        fastCountdownSeconds={30}
+        lagLabel="240s"
+        onRefresh={vi.fn()}
+        notifEnabled={false}
+        onToggleNotifications={vi.fn()}
+        soundEnabled={false}
+        onToggleSound={vi.fn()}
+        onToggleShortcuts={vi.fn()}
+        usingCachedData={false}
+        cachedAt={null}
+        isOffline={false}
+        stateTs="2026-03-06T15:56:00Z"
+        sourceHealthLabel="6/6 ok"
+      />
+    );
+
+    expect(screen.queryByText(/최신 정보가 아닐 수 있습니다/i)).not.toBeInTheDocument();
   });
 });

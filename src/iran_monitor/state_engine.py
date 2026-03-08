@@ -376,42 +376,36 @@ def _build_intel_feed(signals: list[SignalEvent], prev_state: dict[str, Any] | N
         if fp not in prev_first_seen and first:
             prev_first_seen[fp] = first
 
-    official: list[SignalEvent] = []
-    fresh: list[SignalEvent] = []
-    repeated: list[SignalEvent] = []
+    official: list[tuple[SignalEvent, tuple[str, str]]] = []
+    fresh: list[tuple[SignalEvent, tuple[str, str]]] = []
+    repeated: list[tuple[SignalEvent, tuple[str, str]]] = []
 
     for row in signals:
         fingerprint = _signal_fingerprint(row.get("source") or row.get("source_id"), row.get("summary"))
+        if fingerprint in previous_fingerprints:
+            repeated.append((row, fingerprint))
+            continue
+
         is_official = (
             str(row.get("origin") or "").lower() == "source_probe"
             and bool(row.get("confirmed"))
             and str(row.get("tier") or "").upper() == "TIER0"
         )
         if is_official:
-            official.append(row)
-        elif fingerprint in previous_fingerprints:
-            repeated.append(row)
+            official.append((row, fingerprint))
         else:
-            fresh.append(row)
+            fresh.append((row, fingerprint))
 
     ranked = (
-        sorted(official, key=_signal_sort_key, reverse=True)
-        + sorted(fresh, key=_signal_sort_key, reverse=True)
-        + sorted(repeated, key=_signal_sort_key, reverse=True)
+        [(row, "official", fingerprint) for row, fingerprint in sorted(official, key=lambda item: _signal_sort_key(item[0]), reverse=True)]
+        + [(row, "fresh", fingerprint) for row, fingerprint in sorted(fresh, key=lambda item: _signal_sort_key(item[0]), reverse=True)]
+        + [(row, "repeated", fingerprint) for row, fingerprint in sorted(repeated, key=lambda item: _signal_sort_key(item[0]), reverse=True)]
     )
     now_iso = _iso()
     feed: list[dict[str, Any]] = []
-    for row in ranked[:24]:
+    for row, status, fingerprint in ranked[:24]:
         score = float(row.get("score", 0.0))
         ids = ", ".join(row.get("indicator_ids") or [])
-        fingerprint = _signal_fingerprint(row.get("source") or row.get("source_id"), row.get("summary"))
-
-        if row in official:
-            status = "official"
-        elif row in fresh:
-            status = "fresh"
-        else:
-            status = "repeated"
 
         first_seen_ts = prev_first_seen.get(fingerprint, "") if status == "repeated" else ""
         if not first_seen_ts:

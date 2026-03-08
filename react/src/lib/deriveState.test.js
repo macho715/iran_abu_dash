@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LIVE_STALE_CRITICAL_THRESHOLD_SECONDS, LIVE_STALE_SEVERE_THRESHOLD_SECONDS, LIVE_STALE_THRESHOLD_SECONDS } from "./constants.js";
+import {
+  LIVE_STALE_CRITICAL_THRESHOLD_SECONDS,
+  LIVE_STALE_SEVERE_THRESHOLD_SECONDS,
+  LIVE_STALE_THRESHOLD_SECONDS,
+  STALE_WARNING_BANNER_THRESHOLD_MINUTES,
+} from "./constants.js";
 import { deriveState } from "./deriveState.js";
 import { createDashboard } from "../test/fixtures.js";
 
@@ -34,6 +39,28 @@ describe("deriveState", () => {
     expect(stale.liveStale).toBe(true);
     expect(severe.staleSeverity).toBe("SEVERE");
     expect(critical.staleSeverity).toBe("CRITICAL");
+  });
+
+  it("enables warning banner only when lag exceeds minute threshold", () => {
+    const healthy = deriveState(
+      createDashboard({
+        metadata: {
+          stateTs: new Date(Date.now() - (STALE_WARNING_BANNER_THRESHOLD_MINUTES - 1) * 60 * 1000).toISOString(),
+        },
+      })
+    );
+    const stale = deriveState(
+      createDashboard({
+        metadata: {
+          stateTs: new Date(Date.now() - STALE_WARNING_BANNER_THRESHOLD_MINUTES * 60 * 1000).toISOString(),
+        },
+      })
+    );
+
+    expect(healthy.liveLagMinutes).toBe(STALE_WARNING_BANNER_THRESHOLD_MINUTES - 1);
+    expect(healthy.staleWarningVisible).toBe(false);
+    expect(stale.liveLagMinutes).toBe(STALE_WARNING_BANNER_THRESHOLD_MINUTES);
+    expect(stale.staleWarningVisible).toBe(true);
   });
 
   it("derives mode, gate, and airspace states from indicators and triggers", () => {

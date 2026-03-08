@@ -34,6 +34,8 @@ export default function App() {
         usingCachedData={dashboard.usingCachedData}
         cachedAt={dashboard.cachedAt}
         isOffline={dashboard.isOffline}
+        stateTs={dashboard.dash?.metadata?.stateTs}
+        sourceHealthLabel={dashboard.derived.sourceHealthLabel}
       />
 
       <TabBar tabs={dashboard.tabs} activeTab={dashboard.tab} onChange={dashboard.setTab} />

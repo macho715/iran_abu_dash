@@ -144,3 +144,27 @@ export function createHistory() {
     }
   ];
 }
+
+export function createHealthyDashboard(overrides = {}) {
+  return createDashboard({
+    ...overrides,
+    metadata: {
+      stateTs: new Date(Date.now() - (5 * 60 * 1000)).toISOString(),
+      sourceOk: 6,
+      sourceTotal: 6,
+      ...(overrides.metadata || {}),
+    },
+  });
+}
+
+export function createStaleDashboard(overrides = {}) {
+  return createDashboard({
+    ...overrides,
+    metadata: {
+      stateTs: new Date(Date.now() - (125 * 60 * 1000)).toISOString(),
+      sourceOk: 2,
+      sourceTotal: 6,
+      ...(overrides.metadata || {}),
+    },
+  });
+}

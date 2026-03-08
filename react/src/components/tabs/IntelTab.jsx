@@ -1,5 +1,7 @@
 import React, { useMemo } from "react";
+import TabStatePanel from "../TabStatePanel.jsx";
 import { Card } from "../ui.jsx";
+import { countIntelStatuses } from "../../lib/intelStatus.js";
 import { formatTimeGST } from "../../lib/utils.js";
 
 const FILTERS = ["ALL", "CRITICAL", "HIGH", "MEDIUM"];
@@ -20,11 +22,8 @@ function staleDurationLabel(firstSeenTs) {
 }
 
 export default function IntelTab({ allIntelFeed = [], filteredIntelFeed = [], intelFilter, onFilterChange }) {
-  const freshCount = useMemo(
-    () => allIntelFeed.filter((item) => item.status === "fresh" || item.status === "official").length,
-    [allIntelFeed]
-  );
-  const allRepeated = allIntelFeed.length > 0 && freshCount === 0;
+  const statusSummary = useMemo(() => countIntelStatuses(allIntelFeed), [allIntelFeed]);
+  const allRepeated = allIntelFeed.length > 0 && statusSummary.repeatedCount === allIntelFeed.length;
 
   return (
     <div>
@@ -33,20 +32,11 @@ export default function IntelTab({ allIntelFeed = [], filteredIntelFeed = [], in
         <div className="section-subtitle">최신순</div>
 
         {allRepeated && (
-          <div
-            className="section-gap"
-            style={{
-              padding: "8px 12px",
-              background: "rgba(234,179,8,0.08)",
-              border: "1px solid rgba(234,179,8,0.25)",
-              borderRadius: 6,
-              color: "#eab308",
-              fontSize: 13,
-              lineHeight: 1.5,
-            }}
-          >
-            신규 시그널 없음 — 기존 모니터링 결과를 표시 중입니다
-          </div>
+          <TabStatePanel
+            variant="no-fresh"
+            message="반복 감지(repeated) 항목만 표시 중입니다."
+            detail={`반복(repeated): ${statusSummary.repeatedCount}`}
+          />
         )}
 
         <div className="filter-row section-gap">

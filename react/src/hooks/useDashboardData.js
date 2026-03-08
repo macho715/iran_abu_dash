@@ -12,8 +12,8 @@ import { appendHistory, buildDiffEvents, computeDashboardKey, mkEvent } from "..
 import { fetchLatestPointer, fetchPointerArtifact } from "../lib/livePointer.js";
 import {
   FALLBACK_EGRESS_LOSS_ETA,
+  DATA_REVALIDATION_POLICY,
   FAST_COUNTDOWN_SECONDS,
-  FAST_POLL_MS_DEFAULT,
   HISTORY_MAX_POINTS,
   STORAGE_KEYS,
   TIMELINE_MAX,
@@ -92,7 +92,7 @@ export function useDashboardData() {
   const fastPollMs = useMemo(() => {
     const env = Number(import.meta?.env?.VITE_FAST_POLL_MS);
     if (Number.isFinite(env) && env >= 1000) return Math.floor(env);
-    return FAST_POLL_MS_DEFAULT;
+    return DATA_REVALIDATION_POLICY.pollIntervalMs;
   }, []);
   const fastCountdownSeconds = useMemo(() => Math.max(1, Math.ceil(fastPollMs / 1000)), [fastPollMs]);
   const latestCandidates = useMemo(() => getLatestCandidates(), []);
@@ -183,7 +183,9 @@ export function useDashboardData() {
     for (const candidate of candidates) {
       try {
         const separator = candidate.includes("?") ? "&" : "?";
-        const response = await fetch(`${candidate}${separator}t=${Date.now()}`, { cache: "no-store" });
+        const response = await fetch(`${candidate}${separator}t=${Date.now()}`, {
+          cache: DATA_REVALIDATION_POLICY.requestCacheMode,
+        });
         if (!response.ok) continue;
         const payload = await response.json();
         const normalized = normalizeIncomingPayload(payload);

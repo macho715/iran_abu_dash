@@ -16,9 +16,14 @@ export const POLL_INTERVAL_MS = 30 * 60 * 1000;
 export const FAST_POLL_MS_DEFAULT = 30 * 1000;
 export const FAST_COUNTDOWN_SECONDS = 30;
 export const COUNTDOWN_SECONDS = FAST_COUNTDOWN_SECONDS;
+export const DATA_REVALIDATION_POLICY = Object.freeze({
+  pollIntervalMs: FAST_POLL_MS_DEFAULT,
+  requestCacheMode: "no-store",
+});
 export const LIVE_STALE_THRESHOLD_SECONDS = 3600; // 1시간
 export const LIVE_STALE_SEVERE_THRESHOLD_SECONDS = 7200; // 2시간
 export const LIVE_STALE_CRITICAL_THRESHOLD_SECONDS = 14400; // 4시간
+export const STALE_WARNING_BANNER_THRESHOLD_MINUTES = 60;
 
 export const MIN_EVIDENCE_SOURCES = 2;
 export const FALLBACK_EGRESS_LOSS_ETA = 10;

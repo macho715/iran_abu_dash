@@ -41,56 +41,16 @@ jobs:
           playwright install chromium
           playwright install-deps chromium
 
-      - name: Freshness gate
+      - name: Refresh gate
         id: gate
         shell: bash
         run: |
+          echo "should_run=true" >> "$GITHUB_OUTPUT"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
             echo "skip_reason=manual" >> "$GITHUB_OUTPUT"
-            exit 0
+          else
+            echo "skip_reason=scheduled_refresh" >> "$GITHUB_OUTPUT"
           fi
-
-          git fetch origin urgentdash-live --depth=1 || true
-          python - <<'PY' >> "$GITHUB_OUTPUT"
-          import json
-          import subprocess
-          from datetime import datetime, timedelta, timezone
-
-          proc = subprocess.run(
-              ["git", "show", "origin/urgentdash-live:live/latest.json"],
-              capture_output=True,
-              text=True,
-          )
-          if proc.returncode != 0:
-              print("should_run=true")
-              print("skip_reason=missing_latest")
-              raise SystemExit(0)
-
-          try:
-              payload = json.loads(proc.stdout)
-          except Exception:
-              print("should_run=true")
-              print("skip_reason=invalid_latest")
-              raise SystemExit(0)
-
-          collected_at = str(payload.get("collectedAt") or "").replace("Z", "+00:00")
-          if not collected_at:
-              print("should_run=true")
-              print("skip_reason=missing_collected_at")
-              raise SystemExit(0)
-
-          dt = datetime.fromisoformat(collected_at)
-          if dt.tzinfo is None:
-              dt = dt.replace(tzinfo=timezone.utc)
-          age = datetime.now(timezone.utc) - dt.astimezone(timezone.utc)
-          if age < timedelta(minutes=25):
-              print("should_run=false")
-              print(f"skip_reason=fresh_{int(age.total_seconds())}")
-          else:
-              print("should_run=true")
-              print(f"skip_reason=stale_{int(age.total_seconds())}")
-          PY
 
       - name: Run lite stage
         if: steps.gate.outputs.should_run == 'true'

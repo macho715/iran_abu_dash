@@ -37,17 +37,20 @@ export default function DashboardHeader({
   onToggleShortcuts,
   usingCachedData,
   cachedAt,
-  isOffline
+  isOffline,
+  stateTs,
+  sourceHealthLabel,
 }) {
   const staleConfig = staleBannerConfig(derived.staleSeverity);
+  const liveLagMinutes = derived.liveLagMinutes ?? Math.floor((derived.liveLagSeconds || 0) / 60);
 
   return (
     <>
-      {derived.staleSeverity !== "FRESH" && derived.staleSeverity !== "UNKNOWN" && (
+      {derived.staleWarningVisible && derived.staleSeverity !== "UNKNOWN" && (
         <div className={staleConfig.className}>
           <div>
             <span className="banner__title">
-              {staleConfig.icon} 데이터가 {Math.floor((derived.liveLagSeconds || 0) / 60)}분 전입니다
+              {staleConfig.icon} 데이터가 {liveLagMinutes ?? 0}분 전입니다
             </span>
             <span className="banner__meta">최신 정보가 아닐 수 있습니다</span>
           </div>
@@ -78,6 +81,9 @@ export default function DashboardHeader({
             </div>
             <div className={`dash-header__sub ${derived.liveStale ? "is-stale" : ""}`}>
               latest poll every {fastCountdownSeconds}s · live lag: {lagLabel} · {derived.liveStale ? "STALE" : "fresh"}
+            </div>
+            <div className="dash-header__sub">
+              stateTs: {stateTs || "—"} · source health: {sourceHealthLabel || "n/a"}
             </div>
           </div>
           <div className="header-actions">

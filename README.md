@@ -34,7 +34,7 @@ python scripts/run_now.py --mode ai --ai-input state/ai_input.json --telegram-se
 
 - 워크플로: `.github/workflows/monitor.yml`
 - 스케줄: `12,27,42,57 * * * *`
-- Gate: 마지막 `live/latest.json` 발행 시각이 25분 이내면 skip
+- Gate: scheduled run은 매 사이클 refresh 수행, freshness-based skip 없음
 - Job 1: lite stage 실행 후 `live/latest.json`, `live/v/<version>/state-lite.json`, `live/hyie_state.json` 발행
 - Job 2: 같은 version에 대해 AI enrich 실행 후 `live/v/<version>/state-ai.json` 추가 발행
 - 공개 source of truth: `origin/urgentdash-live/live/latest.json`

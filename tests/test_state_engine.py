@@ -174,7 +174,7 @@ class StateEngineTests(unittest.TestCase):
         self.assertGreater(payload["evidence_conf"], 0.75)
         self.assertGreater(payload["evidence_conf"], article_payload["evidence_conf"])
 
-    def test_intel_feed_prioritizes_fresh_articles_over_repeated_articles(self) -> None:
+    def test_intel_feed_prioritizes_fresh_items_over_repeated_items(self) -> None:
         prev_state = {
             "intel_feed": [
                 {"src": "UAE GCAA", "text": "UAE GCAA: airspace operations restricted"},
@@ -222,10 +222,60 @@ class StateEngineTests(unittest.TestCase):
 
         payload = build_state_payload(signals=signals, source_health={}, prev_state=prev_state)
         texts = [item["text"] for item in payload["intel_feed"][:3]]
+        statuses = [item["status"] for item in payload["intel_feed"][:3]]
 
-        self.assertEqual(texts[0], "UAE GCAA: airspace operations restricted")
-        self.assertEqual(texts[1], "Fresh article")
-        self.assertEqual(texts[2], "Repeated article")
+        self.assertEqual(texts[0], "Fresh article")
+        self.assertEqual(statuses[0], "fresh")
+        self.assertEqual(statuses[1:], ["repeated", "repeated"])
+
+    def test_intel_feed_marks_previous_fingerprint_as_repeated_even_when_official(self) -> None:
+        prev_state = {
+            "intel_feed": [
+                {
+                    "src": "UAE GCAA",
+                    "text": "UAE GCAA: airspace operations restricted",
+                    "firstSeenTs": "2026-03-08T09:00:00+04:00",
+                }
+            ]
+        }
+        repeated_official_signal = {
+            "source_id": "tier0_gcaa",
+            "source": "UAE GCAA",
+            "tier": "TIER0",
+            "origin": "source_probe",
+            "indicator_ids": ["I02"],
+            "score": 0.95,
+            "confirmed": True,
+            "ts": "2026-03-08T11:10:06+04:00",
+            "summary": "UAE GCAA: airspace operations restricted",
+            "tags": ["air_update"],
+        }
+        fresh_official_signal = {
+            "source_id": "tier0_mod",
+            "source": "UAE Ministry of Defence",
+            "tier": "TIER0",
+            "origin": "source_probe",
+            "indicator_ids": ["I03"],
+            "score": 0.9,
+            "confirmed": True,
+            "ts": "2026-03-08T11:11:06+04:00",
+            "summary": "UAE Ministry of Defence: missile intercepted",
+            "tags": ["strike"],
+        }
+
+        payload = build_state_payload(
+            signals=[repeated_official_signal, fresh_official_signal],
+            source_health={},
+            prev_state=prev_state,
+        )
+
+        feed_by_text = {item["text"]: item for item in payload["intel_feed"]}
+        self.assertEqual(feed_by_text["UAE GCAA: airspace operations restricted"]["status"], "repeated")
+        self.assertEqual(
+            feed_by_text["UAE GCAA: airspace operations restricted"]["firstSeenTs"],
+            "2026-03-08T09:00:00+04:00",
+        )
+        self.assertEqual(feed_by_text["UAE Ministry of Defence: missile intercepted"]["status"], "official")
 
 
 if __name__ == "__main__":
