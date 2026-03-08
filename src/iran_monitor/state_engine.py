@@ -172,6 +172,28 @@ def _round(value: float | None, digits: int = 3) -> float | None:
     return round(float(value), digits)
 
 
+def _signal_fingerprint(source: Any, summary: Any) -> tuple[str, str]:
+    return (
+        str(source or "").strip().lower(),
+        str(summary or "").strip().lower(),
+    )
+
+
+def _signal_sort_key(row: SignalEvent) -> tuple[float, float, str, str]:
+    score = float(row.get("score", 0.0))
+    ts_iso = _to_ts_iso(row.get("ts"))
+    try:
+        ts_value = datetime.fromisoformat(ts_iso.replace("Z", "+00:00")).timestamp()
+    except Exception:
+        ts_value = 0.0
+    return (
+        score,
+        ts_value,
+        str(row.get("source") or row.get("source_id") or ""),
+        str(row.get("summary") or ""),
+    )
+
+
 _ROUTE_STATUS_PRIORITY = {
     "OPEN": 0,
     "CAUTION": 1,
@@ -337,8 +359,36 @@ def _build_hypotheses(values: dict[str, float]) -> list[dict[str, Any]]:
     ]
 
 
-def _build_intel_feed(signals: list[SignalEvent]) -> list[dict[str, Any]]:
-    ranked = sorted(signals, key=lambda row: float(row.get("score", 0.0)), reverse=True)
+def _build_intel_feed(signals: list[SignalEvent], prev_state: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    previous_fingerprints = {
+        _signal_fingerprint(item.get("src") or item.get("source"), item.get("text") or item.get("summary"))
+        for item in (prev_state or {}).get("intel_feed", [])
+        if isinstance(item, dict)
+    }
+
+    official: list[SignalEvent] = []
+    fresh: list[SignalEvent] = []
+    repeated: list[SignalEvent] = []
+
+    for row in signals:
+        fingerprint = _signal_fingerprint(row.get("source") or row.get("source_id"), row.get("summary"))
+        is_official = (
+            str(row.get("origin") or "").lower() == "source_probe"
+            and bool(row.get("confirmed"))
+            and str(row.get("tier") or "").upper() == "TIER0"
+        )
+        if is_official:
+            official.append(row)
+        elif fingerprint in previous_fingerprints:
+            repeated.append(row)
+        else:
+            fresh.append(row)
+
+    ranked = (
+        sorted(official, key=_signal_sort_key, reverse=True)
+        + sorted(fresh, key=_signal_sort_key, reverse=True)
+        + sorted(repeated, key=_signal_sort_key, reverse=True)
+    )
     feed: list[dict[str, Any]] = []
     for row in ranked[:24]:
         score = float(row.get("score", 0.0))
@@ -505,7 +555,7 @@ def build_state_payload(
         "routes": routes,
         "triggers": triggers,
         "delta_score": _round(delta_score),
-        "intel_feed": _build_intel_feed(signals),
+        "intel_feed": _build_intel_feed(signals, prev_state=prev_state),
         "checklist": CHECKLIST_DEFAULT,
         # urgentdash compatibility payload keys
         "snapshot_ts": state_ts,

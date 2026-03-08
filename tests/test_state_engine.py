@@ -174,6 +174,59 @@ class StateEngineTests(unittest.TestCase):
         self.assertGreater(payload["evidence_conf"], 0.75)
         self.assertGreater(payload["evidence_conf"], article_payload["evidence_conf"])
 
+    def test_intel_feed_prioritizes_fresh_articles_over_repeated_articles(self) -> None:
+        prev_state = {
+            "intel_feed": [
+                {"src": "UAE GCAA", "text": "UAE GCAA: airspace operations restricted"},
+                {"src": "BBC World", "text": "Repeated article"},
+            ]
+        }
+        signals = [
+            {
+                "source_id": "tier0_gcaa",
+                "source": "UAE GCAA",
+                "tier": "TIER0",
+                "origin": "source_probe",
+                "indicator_ids": ["I02"],
+                "score": 0.88,
+                "confirmed": True,
+                "ts": "2026-03-08T11:10:06+04:00",
+                "summary": "UAE GCAA: airspace operations restricted",
+                "tags": ["air_update"],
+            },
+            {
+                "source_id": "article::bbc",
+                "source": "BBC World",
+                "tier": "TIER1",
+                "origin": "article",
+                "indicator_ids": ["I03"],
+                "score": 0.88,
+                "confirmed": False,
+                "ts": "2026-03-08T11:10:07+04:00",
+                "summary": "Repeated article",
+                "tags": ["strike"],
+            },
+            {
+                "source_id": "article::reuters",
+                "source": "Reuters",
+                "tier": "TIER1",
+                "origin": "article",
+                "indicator_ids": ["I03"],
+                "score": 0.88,
+                "confirmed": False,
+                "ts": "2026-03-08T11:10:08+04:00",
+                "summary": "Fresh article",
+                "tags": ["strike"],
+            },
+        ]
+
+        payload = build_state_payload(signals=signals, source_health={}, prev_state=prev_state)
+        texts = [item["text"] for item in payload["intel_feed"][:3]]
+
+        self.assertEqual(texts[0], "UAE GCAA: airspace operations restricted")
+        self.assertEqual(texts[1], "Fresh article")
+        self.assertEqual(texts[2], "Repeated article")
+
 
 if __name__ == "__main__":
     unittest.main()
