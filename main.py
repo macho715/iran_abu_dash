@@ -24,7 +24,7 @@ if str(ROOT) not in sys.path:
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
-from config import settings  # noqa: E402
+from src.iran_monitor.config import settings  # noqa: E402
 
 from src.iran_monitor import app as _app
 from src.iran_monitor import reporter as _canonical_reporter
