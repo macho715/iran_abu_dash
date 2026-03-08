@@ -1,0 +1,33 @@
+{
+  "intel_feed": [
+    {
+      "ts": "Mar 3 14:00",
+      "priority": "CRITICAL",
+      "verified": true,
+      "text": "Emirates & Etihad 모든 상업 운항 3월 5일 14:00까지 중단 연장",
+      "src": "LoyaltyLobby / Etihad 공식",
+      "impact": "I02 = 1.00 유지. 제한적 본국송환 편만 허용."
+    }
+  ],
+  "indicators": [
+    {
+      "id": "I01",
+      "name": "공식 여행경보/대사관 공지",
+      "tier": "TIER0",
+      "state": 1.0,
+      "ts": "Mar 3 13:30",
+      "detail": "미국 Ordered Departure, 영국·호주 Do Not Travel"
+    }
+  ],
+  "hypotheses": [
+    { "id": "H0", "name": "정상", "score": 0.215 },
+    { "id": "H1", "name": "악화", "score": 0.608 },
+    { "id": "H2", "name": "철수준비", "score": 0.798 }
+  ],
+  "routes": [
+    { "id": "A", "name": "Al Ain → Buraimi → Sohar", "base_h": 7.0, "status": "OPEN", "congestion": 0.35 }
+  ],
+  "checklist": [
+    { "id": 1, "text": "Bug-out bag (여권/ID/현금USD+AED/물2L/비상식량)", "done": false }
+  ]
+}

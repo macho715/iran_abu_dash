@@ -1,0 +1,2141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>HyIE-ERC² v2026.05 — SHELTER MODE (Upgraded)</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚠️</text></svg>"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#020617;font-family:'Inter',-apple-system,system-ui,sans-serif}
+    a{color:#93c5fd}
+    a:hover{color:#bfdbfe}
+    ::selection{background:rgba(245,158,11,0.25)}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const {useState,useEffect,useCallback,useRef,useMemo} = React;
+
+/* =========================
+   DATA (as-is from your file)
+   ========================= */
+const INTEL_FEED=[
+  {ts:"Mar 3 14:00",priority:"CRITICAL",verified:true,text:"Emirates & Etihad 모든 상업 운항 3월 5일 14:00까지 중단 연장",src:"LoyaltyLobby / Etihad 공식",impact:"I02 = 1.00 유지. 제한적 본국송환 편만 허용."},
+  {ts:"Mar 3 13:30",priority:"CRITICAL",verified:true,text:"미국 국무부 — 중동 12개국 이상 시민에 즉시 출국 촉구",src:"Al Jazeera / NBC News",impact:"I01 state 1.00 재확인. I07 강화."},
+  {ts:"Mar 3 12:00",priority:"HIGH",verified:true,text:"이란 3일 연속 걸프 지역 보복 공격 지속 — UAE/카타르/쿠웨이트 폭발",src:"Al Jazeera / CNBC",impact:"I03 = 1.00 유지. active_strike_window = true 연장."},
+  {ts:"Mar 3 11:00",priority:"HIGH",verified:true,text:"이스라엘, 이란·헤즈볼라 동시 타격 (테헤란+베이루트) — 분쟁 확대",src:"CNBC Live Updates",impact:"에스컬레이션 추가. 이란 추가 보복 가능성↑"},
+  {ts:"Mar 3 10:30",priority:"HIGH",verified:true,text:"인도 특별 구호편 10편 운항, UAE 제한적 출발 재개",src:"Outlook India / India TV",impact:"I07 state 1.00. 타국 대피 본격화."},
+  {ts:"Mar 3 09:00",priority:"MEDIUM",verified:true,text:"태국 총리: 군용기 동원 중동 자국민 대피 준비 — 11,000명+ UAE 거주",src:"Nation Thailand",impact:"I07 추가 강화. 군사적 대피 수단 동원 단계."},
+  {ts:"Mar 2 22:00",priority:"CRITICAL",verified:true,text:"미 국무부 비긴급 직원 + 가족 UAE 출국 명령 (Ordered Departure)",src:"US Embassy UAE / NBC News",impact:"I01 = 1.00. 미국 Ordered Departure는 극히 이례적."},
+  {ts:"Mar 2 20:00",priority:"HIGH",verified:true,text:"AWS 데이터센터 2곳(UAE) + 1곳(바레인) 드론 피격으로 오프라인",src:"CNBC",impact:"I05 state 0.15↑ — 인프라 피해 시작."},
+  {ts:"Mar 2 18:00",priority:"MEDIUM",verified:true,text:"UAE 슈퍼마켓 재고 안정화 — 패닉바잉 진정, 정부 비축분 충분",src:"The National / Khaleej Times / Gulf News",impact:"I06 0.50→0.35 하향."},
+  {ts:"Mar 2 15:00",priority:"HIGH",verified:true,text:"영국·호주 UAE 여행경보 'Do Not Travel' 최고 단계 격상",src:"VisaHQ / FCDO",impact:"I07 = 1.00 재확인."},
+  {ts:"Mar 1 16:00",priority:"CRITICAL",verified:true,text:"UAE 국방부: 탄도미사일 165발, 드론 541기 탐지 — 3사망 58부상",src:"UAE MoD / Khaleej Times",impact:"I03 = 1.00. 파편 낙하로 민간 피해."},
+  {ts:"Feb 28 23:00",priority:"CRITICAL",verified:true,text:"이란, 미-이스라엘 공습 보복으로 UAE 포함 걸프 전역 공격 개시",src:"Al Jazeera / CNN / Euronews",impact:"전체 상황 개시점."},
+];
+
+const INDICATORS=[
+  {id:"I01",name:"공식 여행경보/대사관 공지",tier:"TIER0",state:1.0,confirmed:true,src:"US State Dept, NL, UK, AU, KR",ts:"Mar 3 13:30",detail:"미국 Ordered Departure, 영국·호주 Do Not Travel, 한국 특별여행주의보",srcCount:5,cv:true},
+  {id:"I02",name:"공항/항공 운영",tier:"TIER0",state:1.0,confirmed:true,src:"Etihad, GCAA, LoyaltyLobby",ts:"Mar 3 14:00",detail:"Etihad/Emirates 3/5 14:00까지 전편 중단. 영공 부분 폐쇄.",srcCount:4,cv:true},
+  {id:"I03",name:"군사/안보 근접도",tier:"TIER1",state:1.0,confirmed:true,src:"UAE MoD, Al Jazeera, CNN, BBC",ts:"Mar 3 12:00",detail:"3일 연속 이란 공격. 미사일 165발 + 드론 541기. 3사망 58부상.",srcCount:6,cv:true},
+  {id:"I04",name:"치안/도로 통제",tier:"TIER1",state:0.60,confirmed:false,src:"Time Out, US Embassy, Canada",ts:"Mar 3 10:00",detail:"파편 지역 도로 폐쇄. 공식 통금 미확인. SMS 공습경보 운영.",srcCount:3,cv:false},
+  {id:"I05",name:"통신/인터넷",tier:"TIER1",state:0.15,confirmed:true,src:"CNBC, 직접 확인",ts:"Mar 3 08:00",detail:"일반 통신 정상. AWS UAE DC 2곳 오프라인.",srcCount:2,cv:true},
+  {id:"I06",name:"필수재/연료",tier:"TIER2",state:0.35,confirmed:true,src:"The National, Khaleej Times, Gulf News",ts:"Mar 2 20:00",detail:"패닉바잉 진정. 연료 정상 (E-Plus 91: AED 2.40/L).",srcCount:4,cv:true},
+  {id:"I07",name:"외국정부 행동",tier:"TIER0",state:1.0,confirmed:true,src:"태국 총리, 인도 항공, UK/AU FCDO",ts:"Mar 3 10:30",detail:"태국 군용기 대피, 인도 10편, UK/AU DNT + 대피 계획.",srcCount:5,cv:true},
+];
+
+const HYPOTHESES=[
+  {id:"H0",name:"정상",score:0.215,color:"#22c55e"},
+  {id:"H1",name:"악화",score:0.608,color:"#f59e0b"},
+  {id:"H2",name:"철수준비",score:0.798,color:"#ef4444"},
+];
+const HYPOTHESIS_COLOR={H0:"#22c55e",H1:"#f59e0b",H2:"#ef4444"};
+
+const ROUTES=[
+  {id:"A",name:"Al Ain → Buraimi → Sohar",base_h:7.0,status:"CAUTION",cong:0.90,
+    note:"Al Ain 국경 혼잡 심화. 통과 가능하나 지연 예상. effective ~13.3h.",
+    newsRefs:[
+      {src:"The National",text:"UAE 거주자 이란 피격 여파로 28시간 우회 귀환 — 육로 혼잡 가중",ts:"2026-03-04"},
+      {src:"BBC / Google News",text:"미국 중동 자국민 긴급 소개 항공편 투입 — 육로 국경 대기 악화 예상",ts:"2026-03-04"},
+    ]},
+  {id:"B",name:"Mezyad → Nizwa",base_h:8.2,status:"CAUTION",cong:0.60,
+    note:"국경 기능 유지 중이나 이란 공습 여파로 대기 시간 증가. effective ~13.1h.",
+    newsRefs:[
+      {src:"The National",text:"이란 공습으로 UAE 전반 여행 차질 — 육로 국경 혼잡도 상승",ts:"2026-03-04"},
+    ]},
+  {id:"C",name:"Saudi Ghuwaifat → Riyadh",base_h:15.5,status:"BLOCKED",cong:0.65,
+    note:"쿠웨이트 드론 피격·걸프 왕정 압박 — 사우디 경유 위험. 사용 금지.",
+    newsRefs:[
+      {src:"BBC",text:"쿠웨이트 드론 공격으로 미군 첫 전사 — 걸프 전역 확전 신호",ts:"2026-03-04"},
+      {src:"Carnegie / Google News",text:"걸프 왕정 이란-미 딜레마 — 사우디 보복 대상 가능성 경고",ts:"2026-03-04"},
+    ]},
+  {id:"D",name:"Fujairah → Khatmat Malaha → Muscat",base_h:9.3,status:"BLOCKED",cong:0.35,
+    note:"Hormuz 긴장으로 유가 급등·항만 운영 제한. 동해안 루트 차단 상태.",
+    newsRefs:[
+      {src:"BBC",text:"국제유가·가스 급등 — Strait of Hormuz 봉쇄 우려 직접 반영",ts:"2026-03-04"},
+      {src:"Al Jazeera",text:"바그다드 공항 인근 폭발 — 걸프 항만·항공 연쇄 차질 패턴",ts:"2026-03-04"},
+    ]},
+];
+
+const CL_INIT=[
+  {id:1,text:"Bug-out bag (여권/ID/현금USD+AED/물2L/비상식량)",done:false},
+  {id:2,text:"차량 연료 Full 확인",done:false},
+  {id:3,text:"오만 보험 Orange Card 사전 구매",done:false},
+  {id:4,text:"대사관 긴급번호 저장 — KR: +971-2-643-8700",done:false},
+  {id:5,text:"Al Ain/Buraimi 루트 GPS 오프라인 맵",done:false},
+  {id:6,text:"가족/회사(SCT) 비상연락 완료",done:false},
+  {id:7,text:"15분마다 대사관/Etihad/BBC 확인",done:false},
+  {id:8,text:"SMS 공습경보 수신 확인",done:false},
+  {id:9,text:"창문 회피 안전구역(내벽) 확보",done:false},
+  {id:10,text:"NetherlandsWorldwide 정보서비스 등록",done:false},
+];
+
+/* =========================
+   STORAGE + LIMITS
+   ========================= */
+const STORAGE_KEYS = {
+  egress: "urgentdash.egressLossETA",
+  history: "urgentdash.history.v1",
+  timeline: "urgentdash.timeline.v1",
+  autoSummary: "urgentdash.autoSummary.v1",
+};
+
+const HISTORY_MAX_POINTS = 96;    // ~24h if you fetch every 15min
+const TIMELINE_MAX = 220;
+
+/* =========================
+   FALLBACK / SNAPSHOT
+   ========================= */
+const FALLBACK_DASHBOARD={
+  intelFeed:INTEL_FEED,
+  indicators:INDICATORS,
+  hypotheses:HYPOTHESES,
+  routes:ROUTES,
+  checklist:CL_INIT,
+  metadata:{egressLossETA:2},
+};
+
+const SNAPSHOT_REQUIRED_KEYS=["intel_feed","indicators","hypotheses","routes","checklist"];
+const DASHBOARD_CANDIDATES=[
+  "/api/state",
+  "./api/state",
+  "api/state",
+  "https://raw.githubusercontent.com/macho715/iran_abu_dash/urgentdash-live/live/hyie_state.json",
+  "./data/dashboard.json",
+];
+
+const MIN_EVIDENCE_SOURCES=2;
+const FALLBACK_EGRESS_LOSS_ETA=2;
+
+/* =========================
+   HELPERS (safe localStorage)
+   ========================= */
+function safeGetLS(key, fallback=null){
+  try{
+    if(typeof window === "undefined") return fallback;
+    const v = window.localStorage.getItem(key);
+    return v == null ? fallback : v;
+  }catch{
+    return fallback;
+  }
+}
+function safeSetLS(key, value){
+  try{
+    if(typeof window === "undefined") return;
+    window.localStorage.setItem(key, value);
+  }catch{}
+}
+function safeJsonParse(raw, fallback){
+  try{
+    const v = JSON.parse(raw);
+    return v ?? fallback;
+  }catch{
+    return fallback;
+  }
+}
+
+/* =========================
+   NORMALIZATION
+   ========================= */
+function toTsIso(value){
+  if(!value) return "";
+  const text=String(value || "").trim();
+  const m=text.match(/^([A-Za-z]{3})\s+(\d{1,2})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/i);
+  const monthMap={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+  const d = m && monthMap[m[1].toLowerCase()] !== undefined
+    ? new Date(new Date().getFullYear(), monthMap[m[1].toLowerCase()], Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5] || "0"), 0)
+    : new Date(text);
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString();
+}
+
+function splitSources(raw=""){
+  return [...new Set(
+    raw
+      .split(/\/|,/)
+      .map((s)=>s.trim())
+      .filter(Boolean)
+      .map((s)=>s.replace(/\s+\(.*?\)$/,"").trim())
+      .filter(Boolean)
+  )];
+}
+function inferEvidenceFromSource(raw){
+  const sources=splitSources(raw);
+  const sourceCount=Math.max(sources.length,0);
+  return {sourceCount,verified:sourceCount>=MIN_EVIDENCE_SOURCES};
+}
+function summarizeSourceHealth(raw){
+  if(!raw||typeof raw!=="object") return {ok:null,total:null};
+  const rows=Object.values(raw);
+  if(!rows.length) return {ok:null,total:null};
+  const ok=rows.filter((r)=>Boolean(r&&r.ok)).length;
+  return {ok,total:rows.length};
+}
+function normalizeConflictStats(raw={}){
+  const toInt=(v)=>{
+    const n=Number(v);
+    return Number.isFinite(n)&&n>=0?Math.trunc(n):null;
+  };
+  const startDate=String(raw?.conflict_start_date||"2026-02-28").trim()||"2026-02-28";
+  return {
+    missiles_total: toInt(raw?.missiles_total),
+    missiles_intercepted: toInt(raw?.missiles_intercepted),
+    drones_total: toInt(raw?.drones_total),
+    drones_destroyed: toInt(raw?.drones_destroyed),
+    casualties_kia: toInt(raw?.casualties_kia),
+    casualties_wia: toInt(raw?.casualties_wia),
+    conflict_start_date: startDate,
+    conflict_day: toInt(raw?.conflict_day),
+    source: String(raw?.source||"fallback"),
+    updated_at: String(raw?.updated_at||""),
+  };
+}
+function normalizeIntelFeedItem(raw={}){
+  const tsIso = toTsIso(raw.tsIso || raw.ts);
+  const evidence = inferEvidenceFromSource(raw.src || "");
+  const sourceCount = Number.isFinite(raw.sourceCount) && raw.sourceCount > 0 ? raw.sourceCount : evidence.sourceCount;
+  return {
+    ...raw,
+    tsIso,
+    ts: tsIso ? tsIso.slice(0,16).replace("T"," ") : raw.ts || "",
+    text: String(raw.text || "").trim(),
+    src: String(raw.src || ""),
+    verified: evidence.verified,
+    sourceCount: Math.max(sourceCount || 0, 0),
+  };
+}
+function normalizeIndicatorItem(raw={}){
+  const tsIso = toTsIso(raw.tsIso || raw.ts);
+  const evidence = inferEvidenceFromSource(raw.src || "");
+  const srcCount = Number.isFinite(raw.srcCount) && raw.srcCount > 0 ? raw.srcCount : evidence.sourceCount;
+  return {
+    ...raw,
+    tsIso,
+    ts: tsIso ? tsIso.slice(0,16).replace("T"," ") : raw.ts || "",
+    srcCount: Math.max(srcCount, 0),
+    cv: srcCount >= MIN_EVIDENCE_SOURCES,
+    verified: srcCount >= MIN_EVIDENCE_SOURCES,
+  };
+}
+function normalizeMetadata(raw={}){
+  const n = Number(raw.egressLossETA);
+  const egressLossETA = Number.isFinite(n) && n >= 0 ? n : FALLBACK_EGRESS_LOSS_ETA;
+  const evidenceConf = typeof raw.evidenceConf==="number"&&Number.isFinite(raw.evidenceConf)?raw.evidenceConf:null;
+  const effectiveThreshold = typeof raw.effectiveThreshold==="number"&&Number.isFinite(raw.effectiveThreshold)?raw.effectiveThreshold:null;
+  const deltaScore = typeof raw.deltaScore==="number"&&Number.isFinite(raw.deltaScore)?raw.deltaScore:null;
+  const urgency = typeof raw.urgency==="number"&&Number.isFinite(raw.urgency)?raw.urgency:null;
+  const sourceOk = typeof raw.sourceOk==="number"&&Number.isFinite(raw.sourceOk)?raw.sourceOk:null;
+  const sourceTotal = typeof raw.sourceTotal==="number"&&Number.isFinite(raw.sourceTotal)?raw.sourceTotal:null;
+  const triggers = raw.triggers&&typeof raw.triggers==="object"?raw.triggers:{};
+  const conflictStats = normalizeConflictStats(raw.conflictStats || {});
+  return {
+    egressLossETA,
+    evidenceConf,
+    effectiveThreshold,
+    deltaScore,
+    urgency,
+    stateTs: raw.stateTs?String(raw.stateTs):"",
+    source: raw.source?String(raw.source):"",
+    status: raw.status?String(raw.status):"",
+    degraded: Boolean(raw.degraded),
+    sourceOk,
+    sourceTotal,
+    triggers,
+    conflictStats,
+  };
+}
+function normalizeHypothesisItem(raw={}){
+  const id=String(raw.id||"");
+  const score=Number(raw.score);
+  return {
+    ...raw,
+    id: id || "H?",
+    score: Number.isFinite(score)?score:0,
+    color: String(raw.color||HYPOTHESIS_COLOR[id]||"#38bdf8"),
+    name: String(raw.name||id||"Unknown"),
+  };
+}
+function normalizeDashboard(payload){
+  if(!payload||typeof payload!=="object") return null;
+  const {intelFeed,indicators,hypotheses,routes,checklist}=payload;
+  if(!Array.isArray(intelFeed)||!Array.isArray(indicators)||!Array.isArray(hypotheses)||!Array.isArray(routes)||!Array.isArray(checklist)) return null;
+  return {
+    intelFeed:intelFeed.map(normalizeIntelFeedItem),
+    indicators:indicators.map(normalizeIndicatorItem),
+    hypotheses:hypotheses.map(normalizeHypothesisItem),
+    routes,
+    checklist,
+    metadata: normalizeMetadata(payload.metadata || {}),
+  };
+}
+function hasSnapshotShape(obj){
+  return obj && typeof obj==="object" && SNAPSHOT_REQUIRED_KEYS.every((k)=>Object.prototype.hasOwnProperty.call(obj,k));
+}
+function clampEgress(value){
+  const n=Number(value);
+  return Number.isFinite(n)&&n>=0?n:FALLBACK_EGRESS_LOSS_ETA;
+}
+function snapshotToDashboard(snapshot){
+  const health = summarizeSourceHealth(snapshot.source_health);
+  return {
+    intelFeed: Array.isArray(snapshot.intel_feed) ? snapshot.intel_feed : [],
+    indicators: Array.isArray(snapshot.indicators)
+      ? snapshot.indicators.map((row)=>({
+          ...row,
+          srcCount: Number.isFinite(row?.srcCount) ? row.srcCount : Number(row?.src_count ?? 0),
+        }))
+      : [],
+    hypotheses: Array.isArray(snapshot.hypotheses) ? snapshot.hypotheses.map(normalizeHypothesisItem) : [],
+    routes: Array.isArray(snapshot.routes) ? snapshot.routes : [],
+    checklist: Array.isArray(snapshot.checklist) ? snapshot.checklist : [],
+    metadata: {
+      egressLossETA: clampEgress(snapshot.egress_loss_eta),
+      evidenceConf: snapshot.evidence_conf,
+      effectiveThreshold: snapshot.effective_threshold,
+      deltaScore: snapshot.delta_score,
+      urgency: snapshot.urgency,
+      stateTs: snapshot.state_ts || snapshot.snapshot_ts || "",
+      source: snapshot.source || "",
+      status: snapshot.status || "",
+      degraded: Boolean(snapshot.degraded),
+      sourceOk: health.ok,
+      sourceTotal: health.total,
+      triggers: snapshot.triggers || {},
+      conflictStats: normalizeConflictStats(snapshot.conflict_stats || {}),
+    },
+  };
+}
+function normalizeIncomingPayload(payload){
+  if(hasSnapshotShape(payload)) return normalizeDashboard(snapshotToDashboard(payload));
+  return normalizeDashboard(payload);
+}
+
+const INITIAL_DASHBOARD = normalizeDashboard(FALLBACK_DASHBOARD) || FALLBACK_DASHBOARD;
+
+/* =========================
+   UI PRIMITIVES
+   ========================= */
+const pC={CRITICAL:"#ef4444",HIGH:"#f59e0b",MEDIUM:"#3b82f6"};
+
+function Card({children, style}){
+  return (
+    <div style={{
+      background:"#0f172a",
+      border:"1px solid #1e293b",
+      borderRadius:12,
+      padding:16,
+      marginBottom:10,
+      ...style
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function Pill({label, value, color="#94a3b8", bg="#0b1220"}){
+  return (
+    <div style={{background:bg,border:"1px solid #1e293b",borderRadius:999,padding:"6px 10px",display:"flex",gap:6,alignItems:"baseline"}}>
+      <span style={{fontSize:10,color:"#64748b",fontWeight:700}}>{label}</span>
+      <span style={{fontSize:12,color, fontWeight:800, fontFamily:"monospace"}}>{value}</span>
+    </div>
+  );
+}
+
+function Pulse({color}){
+  const[o,sO]=useState(1);
+  useEffect(()=>{const i=setInterval(()=>sO(v=>v===1?0.3:1),800);return()=>clearInterval(i)},[]);
+  return <span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",backgroundColor:color,opacity:o,transition:"opacity 0.4s"}}/>;
+}
+
+function Bar({value,max=1,color,h=8}){
+  const pct = max<=0 ? 0 : Math.min((value/max)*100,100);
+  return <div style={{width:"100%",height:h,background:"#1e293b",borderRadius:h/2,overflow:"hidden"}}>
+    <div style={{width:`${pct}%`,height:"100%",background:color,borderRadius:h/2,transition:"width 0.6s"}}/>
+  </div>;
+}
+
+function Gauge({value,color,label,sub}){
+  const gaugeColor=color||HYPOTHESIS_COLOR[String(label||"")]||"#38bdf8";
+  const p=Math.min(Math.max(value,0),1),a=p*180,r=35,cx=45,cy=50;
+  const rad=d=>(d*Math.PI)/180;
+  const ea=180-a,x2=cx+r*Math.cos(rad(ea)),y2=cy-r*Math.sin(rad(ea));
+  return <div style={{textAlign:"center"}}>
+    <svg width={90} height={65} viewBox="0 0 90 65">
+      <path d={`M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}`} fill="none" stroke="#1e293b" strokeWidth={5} strokeLinecap="round"/>
+      {p>0&&<path d={`M ${cx-r} ${cy} A ${r} ${r} 0 ${a>180?1:0} 1 ${x2} ${y2}`} fill="none" stroke={gaugeColor} strokeWidth={5} strokeLinecap="round"/>}
+      <text x={cx} y={cy-8} textAnchor="middle" fill={gaugeColor} fontSize={16} fontWeight={800} fontFamily="monospace">{value.toFixed(3)}</text>
+      <text x={cx} y={cy+6} textAnchor="middle" fill="#94a3b8" fontSize={9}>{label}</text>
+    </svg>
+    {sub&&<div style={{fontSize:10,color:"#64748b",marginTop:-4}}>{sub}</div>}
+  </div>;
+}
+
+/* =========================
+   NEW: Sparkline / MultiLine
+   ========================= */
+function Sparkline({data=[], height=56, color="#60a5fa", min=0, max=1, fill=true, showDots=true}){
+  const gradId = useMemo(()=>`g-${Math.random().toString(36).slice(2,9)}`, []);
+  const width = 280;
+
+  const pts = Array.isArray(data) ? data.map(Number).filter((v)=>Number.isFinite(v)) : [];
+  if(pts.length < 2){
+    return (
+      <svg viewBox={`0 0 ${width} ${height}`} style={{width:"100%",height}}>
+        <rect x="0" y="0" width={width} height={height} rx="10" fill="#0b1220" stroke="#1e293b"/>
+        <text x={width/2} y={height/2} textAnchor="middle" fill="#475569" fontSize="10">no data</text>
+      </svg>
+    );
+  }
+  const clamp = (v)=>Math.min(max, Math.max(min, v));
+  const span = (max-min) || 1;
+  const xs = pts.map((_,i)=> (i/(pts.length-1))*width);
+  const ys = pts.map((v)=> height - ((clamp(v)-min)/span)*height);
+
+  const path = xs.map((x,i)=> `${i===0?"M":"L"} ${x.toFixed(2)} ${ys[i].toFixed(2)}`).join(" ");
+  const area = `M 0 ${height} ` + xs.map((x,i)=> `L ${x.toFixed(2)} ${ys[i].toFixed(2)}`).join(" ") + ` L ${width} ${height} Z`;
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} style={{width:"100%",height}}>
+      <defs>
+        <linearGradient id={gradId} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.30"/>
+          <stop offset="100%" stopColor={color} stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width={width} height={height} rx="10" fill="#0b1220" stroke="#1e293b"/>
+      {fill && <path d={area} fill={`url(#${gradId})`} />}
+      <path d={path} fill="none" stroke={color} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round"/>
+      {showDots && xs.map((x,i)=>(
+        <circle key={i} cx={x} cy={ys[i]} r={i===xs.length-1?3.4:2.2} fill={color} opacity={i===xs.length-1?1:0.6}/>
+      ))}
+    </svg>
+  );
+}
+
+function MultiLineChart({series=[], height=120, min=0, max=1}){
+  const width = 560;
+  const allLens = series.map(s => (Array.isArray(s.data)? s.data.length : 0));
+  const n = Math.max(0, ...allLens);
+
+  if(n < 2){
+    return (
+      <svg viewBox={`0 0 ${width} ${height}`} style={{width:"100%",height}}>
+        <rect x="0" y="0" width={width} height={height} rx="12" fill="#0b1220" stroke="#1e293b"/>
+        <text x={width/2} y={height/2} textAnchor="middle" fill="#475569" fontSize="11">no history yet</text>
+      </svg>
+    );
+  }
+
+  const clamp = (v)=>Math.min(max, Math.max(min, v));
+  const span = (max-min) || 1;
+  const xs = Array.from({length:n}, (_,i)=> (i/(n-1))*width);
+
+  const gridY = [0.25,0.5,0.75].map((p)=>height - p*height);
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} style={{width:"100%",height}}>
+      <rect x="0" y="0" width={width} height={height} rx="12" fill="#0b1220" stroke="#1e293b"/>
+      {gridY.map((y,i)=>(
+        <line key={i} x1="0" x2={width} y1={y} y2={y} stroke="#111827" strokeWidth="1"/>
+      ))}
+      {series.map((s,si)=>{
+        const data = Array.isArray(s.data) ? s.data : [];
+        const ys = xs.map((_,i)=>{
+          const v = Number(data[i] ?? 0);
+          const vv = Number.isFinite(v) ? clamp(v) : 0;
+          return height - ((vv-min)/span)*height;
+        });
+        const path = xs.map((x,i)=> `${i===0?"M":"L"} ${x.toFixed(2)} ${ys[i].toFixed(2)}`).join(" ");
+        const lastX = xs[xs.length-1];
+        const lastY = ys[ys.length-1];
+        return (
+          <g key={si}>
+            <path d={path} fill="none" stroke={s.color||"#60a5fa"} strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" opacity="0.95"/>
+            <circle cx={lastX} cy={lastY} r="3.6" fill={s.color||"#60a5fa"} />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/* =========================
+   NEW: Route Map (SVG)
+   ========================= */
+const ROUTE_GRAPH = {
+  nodes: {
+    ABU:   {x:40,  y:110, label:"Abu Dhabi"},
+    ALAIN: {x:150, y:80,  label:"Al Ain"},
+    MEZY:  {x:150, y:140, label:"Mezyad"},
+    FUJ:   {x:150, y:190, label:"Fujairah"},
+    BURA:  {x:250, y:80,  label:"Buraimi"},
+    SOHAR: {x:360, y:90,  label:"Sohar"},
+    NIZWA: {x:360, y:150, label:"Nizwa"},
+    KHATM: {x:250, y:190, label:"Khatmat Malaha"},
+    MUSC:  {x:390, y:210, label:"Muscat"},
+    GHUW:  {x:250, y:30,  label:"Ghuwaifat"},
+    RIY:   {x:390, y:30,  label:"Riyadh"},
+  },
+  routes: {
+    A: ["ABU","ALAIN","BURA","SOHAR"],
+    B: ["ABU","MEZY","NIZWA"],
+    C: ["ABU","GHUW","RIY"],
+    D: ["ABU","FUJ","KHATM","MUSC"],
+  }
+};
+
+function RouteMap({routes=[], selectedId=null, onSelect=()=>{}}){
+  const w=560, h=250;
+  const byId = useMemo(()=>new Map(routes.map(r=>[r.id,r])), [routes]);
+
+  const colorFor = (status)=>{
+    if(status==="BLOCKED") return "#ef4444";
+    if(status==="CAUTION") return "#f59e0b";
+    return "#22c55e";
+  };
+  const dashFor = (status)=> status==="CAUTION" ? "8 6" : "0";
+  const alphaFor = (status)=> status==="BLOCKED" ? 0.72 : 1;
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:10}}>
+        <div>
+          <div style={{fontSize:13,fontWeight:800,color:"#e2e8f0"}}>🗺️ Route Map (schematic)</div>
+          <div style={{fontSize:10,color:"#64748b",marginTop:4}}>클릭하면 해당 Route 카드가 하이라이트됩니다.</div>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <Pill label="OPEN" value="●" color="#22c55e"/>
+          <Pill label="CAUTION" value="●" color="#f59e0b"/>
+          <Pill label="BLOCKED" value="●" color="#ef4444"/>
+        </div>
+      </div>
+
+      <svg viewBox={`0 0 ${w} ${h}`} style={{width:"100%",height:260}}>
+        <rect x="0" y="0" width={w} height={h} rx="14" fill="#0b1220" stroke="#1e293b"/>
+        <text x="18" y="22" fill="#64748b" fontSize="10">UAE → Border → Destination</text>
+
+        {Object.entries(ROUTE_GRAPH.routes).map(([rid, seq])=>{
+          const r = byId.get(rid) || {status:"OPEN"};
+          const pts = seq.map(key=>ROUTE_GRAPH.nodes[key]).filter(Boolean);
+          const pointsStr = pts.map(p=>`${p.x},${p.y}`).join(" ");
+          const stroke = colorFor(r.status);
+          const isSel = selectedId===rid;
+
+          return (
+            <g key={rid} onClick={()=>onSelect(rid)} style={{cursor:"pointer"}}>
+              <polyline
+                points={pointsStr}
+                fill="none"
+                stroke={stroke}
+                strokeWidth={isSel?6:4}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                strokeDasharray={dashFor(r.status)}
+                opacity={alphaFor(r.status)}
+              />
+              {/* label */}
+              <rect x={pts[0].x-18} y={pts[0].y-26} width="26" height="18" rx="6" fill="#0f172a" stroke="#1e293b"/>
+              <text x={pts[0].x-5} y={pts[0].y-13} fill={stroke} fontSize="11" fontWeight="800">{rid}</text>
+            </g>
+          );
+        })}
+
+        {/* nodes */}
+        {Object.entries(ROUTE_GRAPH.nodes).map(([k, n])=>(
+          <g key={k}>
+            <circle cx={n.x} cy={n.y} r="5" fill="#94a3b8" opacity="0.8"/>
+            <text x={n.x+8} y={n.y+4} fill="#94a3b8" fontSize="9">{n.label}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+/* =========================
+   NEW: Timeline
+   ========================= */
+function formatTsGST(tsIso){
+  if(!tsIso) return "—";
+  const d = new Date(tsIso);
+  if(Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Dubai"});
+}
+
+function TimelinePanel({timeline=[], onClear=()=>{}, onExport=()=>{}}){
+  const [level, setLevel] = useState("ALL");
+  const [cat, setCat] = useState("ALL");
+  const [q, setQ] = useState("");
+
+  const levelColor = (lvl)=>{
+    if(lvl==="ALERT") return "#ef4444";
+    if(lvl==="WARN") return "#f59e0b";
+    return "#60a5fa";
+  };
+
+  const filtered = useMemo(()=>{
+    const query = q.trim().toLowerCase();
+    return timeline.filter(ev=>{
+      if(level!=="ALL" && ev.level!==level) return false;
+      if(cat!=="ALL" && ev.category!==cat) return false;
+      if(!query) return true;
+      const hay = `${ev.title||""} ${ev.detail||""}`.toLowerCase();
+      return hay.includes(query);
+    });
+  }, [timeline, level, cat, q]);
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap",marginBottom:10}}>
+        <div>
+          <div style={{fontSize:13,fontWeight:800}}>🕒 Timeline Event Log</div>
+          <div style={{fontSize:10,color:"#64748b",marginTop:4}}>대시보드 업데이트/상태 변화가 자동으로 기록됩니다.</div>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button onClick={onExport} style={{background:"#0b1220",border:"1px solid #1e293b",color:"#e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>JSON Export</button>
+          <button onClick={onClear} style={{background:"#7f1d1d",border:"1px solid #991b1b",color:"#fee2e2",borderRadius:8,padding:"8px 10px",fontSize:11,fontWeight:800,cursor:"pointer"}}>Clear</button>
+        </div>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
+        <select value={level} onChange={(e)=>setLevel(e.target.value)} style={{background:"#0b1220",border:"1px solid #1e293b",borderRadius:10,color:"#e2e8f0",padding:"10px 10px",fontSize:12}}>
+          <option value="ALL">Level: ALL</option>
+          <option value="INFO">INFO</option>
+          <option value="WARN">WARN</option>
+          <option value="ALERT">ALERT</option>
+        </select>
+        <select value={cat} onChange={(e)=>setCat(e.target.value)} style={{background:"#0b1220",border:"1px solid #1e293b",borderRadius:10,color:"#e2e8f0",padding:"10px 10px",fontSize:12}}>
+          <option value="ALL">Category: ALL</option>
+          <option value="SYSTEM">SYSTEM</option>
+          <option value="MODE">MODE</option>
+          <option value="GATE">GATE</option>
+          <option value="AIRSPACE">AIRSPACE</option>
+          <option value="EVIDENCE">EVIDENCE</option>
+          <option value="ROUTE">ROUTE</option>
+          <option value="INTEL">INTEL</option>
+          <option value="SIM">SIM</option>
+        </select>
+        <input value={q} onChange={(e)=>setQ(e.target.value)} placeholder="Search…" style={{background:"#0b1220",border:"1px solid #1e293b",borderRadius:10,color:"#e2e8f0",padding:"10px 10px",fontSize:12}}/>
+      </div>
+
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {filtered.length===0 && (
+          <div style={{padding:14,borderRadius:10,border:"1px dashed #1e293b",background:"#0b1220",color:"#64748b",fontSize:12}}>
+            이벤트가 없습니다. (대시보드가 새로 갱신되면 자동으로 쌓입니다.)
+          </div>
+        )}
+        {filtered.slice(0,200).map(ev=>(
+          <div key={ev.id} style={{display:"flex",gap:10,alignItems:"flex-start",padding:12,borderRadius:12,border:"1px solid #1e293b",background:"#0b1220"}}>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+              <span style={{width:10,height:10,borderRadius:"50%",background:levelColor(ev.level)}}/>
+              <span style={{fontSize:9,color:"#64748b",fontFamily:"monospace"}}>{formatTsGST(ev.ts)}</span>
+            </div>
+            <div style={{flex:1}}>
+              <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                <div style={{fontSize:12,fontWeight:800,color:"#e2e8f0"}}>{ev.title}</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <span style={{fontSize:10,padding:"2px 8px",borderRadius:999,background:"#0f172a",border:"1px solid #1e293b",color:"#94a3b8"}}>{ev.category}</span>
+                  <span style={{fontSize:10,padding:"2px 8px",borderRadius:999,background:"#0f172a",border:"1px solid #1e293b",color:levelColor(ev.level),fontWeight:800}}>{ev.level}</span>
+                </div>
+              </div>
+              {ev.detail && <div style={{marginTop:6,fontSize:11,color:"#94a3b8",whiteSpace:"pre-wrap"}}>{ev.detail}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* =========================
+   NEW: AI-ish Summary (rule-based)
+   ========================= */
+function copyText(text){
+  if(!text) return;
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).catch(()=>{});
+    return;
+  }
+  // fallback
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position="fixed";
+  ta.style.left="-9999px";
+  ta.style.top="-9999px";
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try{ document.execCommand("copy"); }catch{}
+  document.body.removeChild(ta);
+}
+
+function buildOfflineSummary(dash, derived){
+  const topIntel = (dash.intelFeed||[]).slice(0,3);
+  const routes = Array.isArray(dash.routes) ? dash.routes : [];
+  const bf = 2.0;
+  const usable = routes
+    .filter(r=>r.status!=="BLOCKED")
+    .map(r=>{
+      const eff = r.base_h*(1+r.cong)*bf;
+      return {...r, eff};
+    })
+    .sort((a,b)=>a.eff-b.eff);
+
+  const lines = [];
+  lines.push(`요약(${new Date().toLocaleString("ko-KR",{timeZone:"Asia/Dubai"})} GST)`);
+  lines.push(`- MODE: ${derived.modeState} / Gate: ${derived.gateState} / Airspace: ${derived.airspaceState} / Evidence: ${derived.evidenceState}`);
+  lines.push(`- Leading: ${derived.leadingHypothesis.id} (${derived.leadingHypothesis.name}) score=${Number(derived.leadingHypothesis.score||0).toFixed(3)} / H2=${derived.h2Score.toFixed(3)} → ${derived.likelihoodLabel} (${derived.likelihoodBand})`);
+  lines.push(`- RED 지표: ΔScore=${derived.ds.toFixed(3)} (thr=0.20) / Conf=${derived.ec.toFixed(3)} vs Thr=${derived.effectiveThreshold.toFixed(3)} / Urgency=${derived.urgencyScore.toFixed(2)}`);
+  if(usable.length){
+    lines.push(`- 추천 이동(사용 가능): ${usable.slice(0,2).map(r=>`Route ${r.id} ${r.status} ~${r.eff.toFixed(1)}h`).join(" · ")}`);
+  }else{
+    lines.push(`- 이동: 사용 가능 경로 없음 (모든 Route가 BLOCKED 또는 제한됨)`);
+  }
+  if(topIntel.length){
+    lines.push(`- 주요 Intel(최신 3):`);
+    topIntel.forEach(item=>{
+      lines.push(`  • [${item.priority}] ${formatTsGST(item.tsIso)} — ${item.text}`);
+    });
+  }
+  lines.push(`※ 본 요약은 대시보드 입력값 기반 “룰 기반” 자동 요약입니다.`);
+  return lines.join("\n");
+}
+
+/* =========================
+   NEW: Scenario Simulator
+   ========================= */
+function Simulator({liveDash, liveDerived, onLog=()=>{}}){
+  const [sim, setSim] = useState(null);
+
+  // initialize from live once
+  useEffect(()=>{
+    if(sim) return;
+    const findInd = (id)=> (liveDash.indicators||[]).find(x=>x.id===id) || {};
+    const i01=findInd("I01"), i02=findInd("I02"), i03=findInd("I03"), i04=findInd("I04");
+    const h = (id)=> Number((liveDash.hypotheses||[]).find(x=>x.id===id)?.score || 0);
+
+    setSim({
+      egressLossETA: clampEgress(liveDash?.metadata?.egressLossETA ?? 2),
+      effectiveThreshold: Number.isFinite(liveDerived?.effectiveThreshold) ? liveDerived.effectiveThreshold : 0.80,
+      evidenceConf: Number.isFinite(liveDerived?.ec) ? liveDerived.ec : 0,
+      deltaScore: Number.isFinite(liveDerived?.ds) ? liveDerived.ds : 0,
+      degraded: Boolean(liveDash?.metadata?.degraded),
+      triggers: {...(liveDash?.metadata?.triggers||{})},
+      hypotheses: {H0:h("H0"), H1:h("H1"), H2:h("H2")},
+      indicators: {
+        I01: Number(i01.state||0),
+        I02: Number(i02.state||0),
+        I03: Number(i03.state||0),
+        I04: Number(i04.state||0),
+      },
+      routes: (liveDash.routes||[]).map(r=>({
+        id:r.id,
+        base_h:Number(r.base_h||0),
+        status:r.status,
+        cong:Number(r.cong||0),
+      })),
+    });
+  }, [sim, liveDash, liveDerived]);
+
+  const buildDashFromSim = useCallback((s)=>{
+    if(!s) return null;
+    const dash = {
+      intelFeed: liveDash.intelFeed || [],
+      checklist: liveDash.checklist || [],
+      hypotheses: [
+        {id:"H0", name:"정상", score:Number(s.hypotheses.H0||0), color:"#22c55e"},
+        {id:"H1", name:"악화", score:Number(s.hypotheses.H1||0), color:"#f59e0b"},
+        {id:"H2", name:"철수준비", score:Number(s.hypotheses.H2||0), color:"#ef4444"},
+      ],
+      indicators: [
+        {...((liveDash.indicators||[]).find(x=>x.id==="I01")||{}), id:"I01", state:Number(s.indicators.I01||0), srcCount:5, cv:true},
+        {...((liveDash.indicators||[]).find(x=>x.id==="I02")||{}), id:"I02", state:Number(s.indicators.I02||0), srcCount:4, cv:true},
+        {...((liveDash.indicators||[]).find(x=>x.id==="I03")||{}), id:"I03", state:Number(s.indicators.I03||0), srcCount:6, cv:true},
+        {...((liveDash.indicators||[]).find(x=>x.id==="I04")||{}), id:"I04", state:Number(s.indicators.I04||0), srcCount:3, cv:false},
+      ],
+      routes: (s.routes||[]).map(r=>({
+        ...r,
+        note: (liveDash.routes||[]).find(x=>x.id===r.id)?.note || "",
+        newsRefs: (liveDash.routes||[]).find(x=>x.id===r.id)?.newsRefs || [],
+      })),
+      metadata: {
+        ...(liveDash.metadata||{}),
+        egressLossETA: clampEgress(s.egressLossETA),
+        evidenceConf: Number(s.evidenceConf||0),
+        effectiveThreshold: Number(s.effectiveThreshold||0.80),
+        deltaScore: Number(s.deltaScore||0),
+        degraded: Boolean(s.degraded),
+        triggers: {...(s.triggers||{})},
+        source: "SIMULATOR",
+        status: "sim",
+        stateTs: new Date().toISOString(),
+        conflictStats: normalizeConflictStats(liveDash?.metadata?.conflictStats||{}),
+      }
+    };
+    return normalizeDashboard(dash) || dash;
+  }, [liveDash]);
+
+  const simDash = useMemo(()=> buildDashFromSim(sim), [sim, buildDashFromSim]);
+  const simDerived = useMemo(()=> (simDash ? deriveState(simDash, sim?.egressLossETA) : null), [simDash, sim]);
+
+  const update = (path, value)=>{
+    setSim(prev=>{
+      if(!prev) return prev;
+      const next = structuredClone(prev);
+      // tiny path setter
+      const parts = path.split(".");
+      let cur = next;
+      for(let i=0;i<parts.length-1;i++){
+        cur = cur[parts[i]];
+      }
+      cur[parts[parts.length-1]] = value;
+      return next;
+    });
+  };
+
+  const toggleTrig = (k)=>{
+    setSim(prev=>{
+      if(!prev) return prev;
+      return {...prev, triggers:{...prev.triggers, [k]: !prev.triggers?.[k]}};
+    });
+  };
+
+  if(!sim || !simDash || !simDerived){
+    return <div style={{color:"#94a3b8",fontSize:12}}>Simulator initializing…</div>;
+  }
+
+  const routeStatusColor = (st)=> st==="BLOCKED"?"#ef4444":st==="CAUTION"?"#f59e0b":"#22c55e";
+
+  return (
+    <div style={{display:"grid",gridTemplateColumns:"1.15fr 0.85fr",gap:10}}>
+      <Card style={{marginBottom:0}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap",marginBottom:10}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:900}}>🧪 Scenario Simulator</div>
+            <div style={{fontSize:10,color:"#64748b",marginTop:4}}>가정치를 바꾸면 파생 상태(MODE/Gate/Airspace 등)가 즉시 재계산됩니다.</div>
+          </div>
+          <button
+            onClick={()=>{
+              onLog({
+                level:"INFO",
+                category:"SIM",
+                title:"Simulator snapshot logged",
+                detail:`MODE=${simDerived.modeState} Gate=${simDerived.gateState} Airspace=${simDerived.airspaceState} Δ=${simDerived.ds.toFixed(3)} Conf=${simDerived.ec.toFixed(3)}`
+              });
+            }}
+            style={{background:"#0b1220",border:"1px solid #1e293b",color:"#e2e8f0",borderRadius:10,padding:"10px 12px",fontSize:11,fontWeight:800,cursor:"pointer"}}
+          >
+            Log to timeline
+          </button>
+        </div>
+
+        {/* sliders */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {/* Hypotheses */}
+          <div style={{background:"#0b1220",border:"1px solid #1e293b",borderRadius:12,padding:12}}>
+            <div style={{fontSize:12,fontWeight:800,color:"#e2e8f0"}}>Hypotheses</div>
+            {["H0","H1","H2"].map(id=>(
+              <div key={id} style={{marginTop:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#94a3b8"}}>
+                  <span style={{fontWeight:800,color:HYPOTHESIS_COLOR[id]}}>{id}</span>
+                  <span style={{fontFamily:"monospace"}}>{Number(sim.hypotheses[id]||0).toFixed(3)}</span>
+                </div>
+                <input
+                  type="range" min="0" max="1" step="0.001"
+                  value={Number(sim.hypotheses[id]||0)}
+                  onChange={(e)=>update(`hypotheses.${id}`, Number(e.target.value))}
+                  style={{width:"100%"}}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Evidence */}
+          <div style={{background:"#0b1220",border:"1px solid #1e293b",borderRadius:12,padding:12}}>
+            <div style={{fontSize:12,fontWeight:800,color:"#e2e8f0"}}>Evidence / Threshold</div>
+            <div style={{marginTop:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#94a3b8"}}>
+                <span>EvidenceConf</span>
+                <span style={{fontFamily:"monospace"}}>{Number(sim.evidenceConf||0).toFixed(3)}</span>
+              </div>
+              <input type="range" min="0" max="1" step="0.001" value={Number(sim.evidenceConf||0)} onChange={(e)=>update("evidenceConf", Number(e.target.value))} style={{width:"100%"}}/>
+            </div>
+            <div style={{marginTop:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#94a3b8"}}>
+                <span>EffectiveThreshold</span>
+                <span style={{fontFamily:"monospace"}}>{Number(sim.effectiveThreshold||0.8).toFixed(3)}</span>
+              </div>
+              <input type="range" min="0.5" max="0.95" step="0.001" value={Number(sim.effectiveThreshold||0.8)} onChange={(e)=>update("effectiveThreshold", Number(e.target.value))} style={{width:"100%"}}/>
+            </div>
+            <div style={{marginTop:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#94a3b8"}}>
+                <span>ΔScore</span>
+                <span style={{fontFamily:"monospace"}}>{Number(sim.deltaScore||0).toFixed(3)}</span>
+              </div>
+              <input type="range" min="-0.2" max="0.6" step="0.001" value={Number(sim.deltaScore||0)} onChange={(e)=>update("deltaScore", Number(e.target.value))} style={{width:"100%"}}/>
+            </div>
+            <div style={{marginTop:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#94a3b8"}}>
+                <span>Egress loss ETA (h)</span>
+                <span style={{fontFamily:"monospace"}}>{Number(sim.egressLossETA||0).toFixed(2)}</span>
+              </div>
+              <input type="range" min="0" max="24" step="0.25" value={Number(sim.egressLossETA||0)} onChange={(e)=>update("egressLossETA", Number(e.target.value))} style={{width:"100%"}}/>
+            </div>
+          </div>
+
+          {/* Indicators */}
+          <div style={{background:"#0b1220",border:"1px solid #1e293b",borderRadius:12,padding:12}}>
+            <div style={{fontSize:12,fontWeight:800,color:"#e2e8f0"}}>Indicators (I01~I04)</div>
+            {["I01","I02","I03","I04"].map(id=>(
+              <div key={id} style={{marginTop:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#94a3b8"}}>
+                  <span style={{fontWeight:800}}>{id}</span>
+                  <span style={{fontFamily:"monospace"}}>{Number(sim.indicators[id]||0).toFixed(2)}</span>
+                </div>
+                <input type="range" min="0" max="1" step="0.01" value={Number(sim.indicators[id]||0)} onChange={(e)=>update(`indicators.${id}`, Number(e.target.value))} style={{width:"100%"}}/>
+              </div>
+            ))}
+          </div>
+
+          {/* Triggers */}
+          <div style={{background:"#0b1220",border:"1px solid #1e293b",borderRadius:12,padding:12}}>
+            <div style={{fontSize:12,fontWeight:800,color:"#e2e8f0"}}>Triggers</div>
+            {[
+              ["kr_leave_immediately","KR leave immediately"],
+              ["strike_detected","strike_detected"],
+              ["border_change","border_change"],
+              ["red_imminent","red_imminent"],
+            ].map(([k,label])=>(
+              <label key={k} style={{display:"flex",alignItems:"center",gap:10,marginTop:10,cursor:"pointer"}}>
+                <input type="checkbox" checked={Boolean(sim.triggers?.[k])} onChange={()=>toggleTrig(k)} />
+                <span style={{fontSize:12,color:"#e2e8f0"}}>{label}</span>
+              </label>
+            ))}
+            <label style={{display:"flex",alignItems:"center",gap:10,marginTop:12,cursor:"pointer"}}>
+              <input type="checkbox" checked={Boolean(sim.degraded)} onChange={()=>update("degraded", !sim.degraded)} />
+              <span style={{fontSize:12,color:"#e2e8f0"}}>degraded</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Routes quick edit */}
+        <div style={{marginTop:12,background:"#0b1220",border:"1px solid #1e293b",borderRadius:12,padding:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+            <div style={{fontSize:12,fontWeight:800}}>Routes (what-if)</div>
+            <div style={{fontSize:10,color:"#64748b"}}>status / congestion / base_h</div>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:10}}>
+            {(sim.routes||[]).map((r, idx)=>(
+              <div key={r.id} style={{display:"grid",gridTemplateColumns:"60px 1fr 1fr 1fr",gap:8,alignItems:"center"}}>
+                <div style={{fontSize:12,fontWeight:900,color:"#e2e8f0"}}>Route {r.id}</div>
+                <select
+                  value={r.status}
+                  onChange={(e)=>{
+                    const v=e.target.value;
+                    setSim(prev=>{
+                      const next=structuredClone(prev);
+                      next.routes[idx].status=v;
+                      return next;
+                    });
+                  }}
+                  style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:10,color:routeStatusColor(r.status),padding:"8px 10px",fontWeight:900}}
+                >
+                  <option value="OPEN">OPEN</option>
+                  <option value="CAUTION">CAUTION</option>
+                  <option value="BLOCKED">BLOCKED</option>
+                </select>
+
+                <div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#64748b"}}>
+                    <span>cong</span>
+                    <span style={{fontFamily:"monospace"}}>{Number(r.cong||0).toFixed(2)}</span>
+                  </div>
+                  <input type="range" min="0" max="1" step="0.01" value={Number(r.cong||0)} onChange={(e)=>{
+                    const v=Number(e.target.value);
+                    setSim(prev=>{
+                      const next=structuredClone(prev);
+                      next.routes[idx].cong=v;
+                      return next;
+                    });
+                  }} style={{width:"100%"}}/>
+                </div>
+
+                <div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#64748b"}}>
+                    <span>base_h</span>
+                    <span style={{fontFamily:"monospace"}}>{Number(r.base_h||0).toFixed(1)}</span>
+                  </div>
+                  <input type="range" min="2" max="24" step="0.1" value={Number(r.base_h||0)} onChange={(e)=>{
+                    const v=Number(e.target.value);
+                    setSim(prev=>{
+                      const next=structuredClone(prev);
+                      next.routes[idx].base_h=v;
+                      return next;
+                    });
+                  }} style={{width:"100%"}}/>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      <Card style={{marginBottom:0}}>
+        <div style={{fontSize:13,fontWeight:900,marginBottom:8}}>✅ Sim Result</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          <Pill label="MODE" value={simDerived.modeState} color={simDerived.modeColor}/>
+          <Pill label="Gate" value={simDerived.gateState} color={simDerived.gateState==="BLOCKED"?"#ef4444":simDerived.gateState==="CAUTION"?"#f59e0b":"#22c55e"}/>
+          <Pill label="Airspace" value={simDerived.airspaceState} color={simDerived.airspaceState==="OPEN"?"#22c55e":simDerived.airspaceState==="DISRUPTED"?"#f59e0b":"#ef4444"}/>
+          <Pill label="Evidence" value={simDerived.evidenceState} color={simDerived.evidenceState==="PASSED"?"#22c55e":"#f59e0b"}/>
+          <Pill label="ΔScore" value={simDerived.ds.toFixed(3)} color={simDerived.ds>=0.2?"#ef4444":simDerived.ds>=0.15?"#f59e0b":"#94a3b8"}/>
+          <Pill label="Conf" value={simDerived.ec.toFixed(3)} color={simDerived.ec>=simDerived.effectiveThreshold?"#22c55e":"#f59e0b"}/>
+        </div>
+
+        <div style={{marginTop:12,background:"#0b1220",border:"1px solid #1e293b",borderRadius:12,padding:12}}>
+          <div style={{fontSize:12,fontWeight:800}}>추천 루트(사용 가능)</div>
+          <div style={{fontSize:10,color:"#64748b",marginTop:4}}>Simulator의 route 값 기준, buffer x2 반영</div>
+          <div style={{marginTop:8,display:"flex",flexDirection:"column",gap:6}}>
+            {(() => {
+              const bf=2.0;
+              const list=(simDash.routes||[])
+                .filter(r=>r.status!=="BLOCKED")
+                .map(r=>({id:r.id,status:r.status,eff:r.base_h*(1+r.cong)*bf, cong:r.cong}))
+                .sort((a,b)=>a.eff-b.eff);
+              if(!list.length){
+                return <div style={{fontSize:12,color:"#fca5a5"}}>사용 가능한 루트가 없습니다.</div>;
+              }
+              return list.slice(0,3).map(r=>(
+                <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",borderRadius:10,border:"1px solid #1e293b",background:"#0f172a"}}>
+                  <div style={{fontSize:12,fontWeight:900}}>Route {r.id} <span style={{fontSize:10,color:routeStatusColor(r.status),fontWeight:900}}>{r.status}</span></div>
+                  <div style={{fontFamily:"monospace",fontWeight:900}}>{r.eff.toFixed(1)}h</div>
+                </div>
+              ));
+            })()}
+          </div>
+        </div>
+
+        <div style={{marginTop:12,fontSize:10,color:"#475569"}}>
+          💡 Simulator는 라이브 데이터를 바꾸지 않습니다. “Log to timeline”으로 기록만 남깁니다.
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/* =========================
+   DERIVE STATE (shared for UI/history/simulator)
+   ========================= */
+function deriveState(dash, egressLossETAOverride){
+  const indicators = Array.isArray(dash?.indicators) ? dash.indicators : [];
+  const hypotheses = Array.isArray(dash?.hypotheses) ? dash.hypotheses : [];
+  const findIndicator = (id)=>indicators.find((row)=>row.id===id)||{};
+  const i01=findIndicator("I01");
+  const i02=findIndicator("I02");
+  const i03=findIndicator("I03");
+  const i04=findIndicator("I04");
+
+  const hypothesesSorted=[...hypotheses].sort((a,b)=>(Number(b?.score)||0)-(Number(a?.score)||0));
+  const leadingHypothesis=hypothesesSorted[0]||{id:"H?",name:"Unknown",score:0};
+  const leadingColor=leadingHypothesis.id==="H2"?"#ef4444":leadingHypothesis.id==="H1"?"#f59e0b":"#22c55e";
+
+  const dsFromMeta=dash?.metadata?.deltaScore;
+  const ds=typeof dsFromMeta==="number"&&Number.isFinite(dsFromMeta)
+    ? dsFromMeta
+    : (hypotheses.find(h=>h.id==="H2")?.score||0)-(hypotheses.find(h=>h.id==="H1")?.score||0);
+
+  const ecFromMeta=dash?.metadata?.evidenceConf;
+  const ec=typeof ecFromMeta==="number"&&Number.isFinite(ecFromMeta)?ecFromMeta:0;
+
+  const thresholdFromMeta=dash?.metadata?.effectiveThreshold;
+  const effectiveThreshold=typeof thresholdFromMeta==="number"&&Number.isFinite(thresholdFromMeta)?thresholdFromMeta:0.80;
+
+  const triggers=dash?.metadata?.triggers||{};
+  const liveDegraded=Boolean(dash?.metadata?.degraded);
+
+  const gateStay=(Number(i01?.state)||0)>=0.7 || Boolean(triggers.kr_leave_immediately);
+  const gateStrike=Boolean(triggers.strike_detected) || (Number(i03?.state)||0)>=0.7;
+  const gateRoad=Boolean(triggers.border_change) || (Number(i04?.state)||0)>=0.6;
+  const gateActiveCount=[gateStay,gateStrike,gateRoad].filter(Boolean).length;
+  const gateState=gateActiveCount>=2?"BLOCKED":gateActiveCount===1?"CAUTION":"OPEN";
+
+  const modeState=liveDegraded?"DEGRADED":(Boolean(triggers.red_imminent)||ds>=0.2?"RED_PREP":"AMBER");
+  const modeColor=modeState==="DEGRADED"?"#ef4444":modeState==="RED_PREP"?"#f59e0b":"#22c55e";
+
+  const evidenceState=ec>=effectiveThreshold?"PASSED":"WATCH";
+  const airspaceState=(Number(i02?.state)||0)>=0.8?"CLOSED":(Number(i02?.state)||0)>=0.5?"DISRUPTED":"OPEN";
+  const airspaceHint=String(i02?.detail||"").slice(0,42);
+
+  const h2Score=Number(hypotheses.find((row)=>row.id==="H2")?.score||0);
+  const likelihoodLabel=h2Score>=0.8?"HIGHLY LIKELY":h2Score>=0.55?"LIKELY":h2Score>=0.35?"POSSIBLE":"UNLIKELY";
+  const likelihoodBand=h2Score>=0.8?">=80%":h2Score>=0.55?"55-80%":h2Score>=0.35?"35-55%":"<35%";
+  const likelihoodBasis=`H2 ${h2Score.toFixed(3)} / ΔScore ${ds.toFixed(3)} / Conf ${ec.toFixed(3)}`;
+
+  const evidenceFloorT0 = indicators.filter(i=>i.tier==="TIER0"&&i.cv).length;
+
+  const urgencyFromMeta=dash?.metadata?.urgency;
+  const egress = Number.isFinite(egressLossETAOverride) ? egressLossETAOverride
+    : (Number.isFinite(dash?.metadata?.egressLossETA) ? dash.metadata.egressLossETA : FALLBACK_EGRESS_LOSS_ETA);
+  const urgencyScore=typeof urgencyFromMeta==="number"&&Number.isFinite(urgencyFromMeta)
+    ? urgencyFromMeta
+    : Math.min(1,Math.max(0,1 - egress / 12));
+
+  const confBand=ec>=0.8?"HIGH":ec>=0.6?"MEDIUM-HIGH":ec>=0.4?"MEDIUM":"LOW";
+
+  const conflictStats=normalizeConflictStats(dash?.metadata?.conflictStats||{});
+  const conflictDayLabel=Number.isFinite(conflictStats.conflict_day)?`Day ${conflictStats.conflict_day}`:"n/a";
+
+  const sourceOk=dash?.metadata?.sourceOk;
+  const sourceTotal=dash?.metadata?.sourceTotal;
+  const liveSource=dash?.metadata?.source||"n/a";
+  const sourceHealthLabel=(typeof sourceOk==="number"&&Number.isFinite(sourceOk)&&typeof sourceTotal==="number"&&Number.isFinite(sourceTotal))
+    ? `${sourceOk}/${sourceTotal} ok`
+    : "n/a";
+
+  const dsGap=0.20-ds;
+  const dsGapLabel=ds>=0.20?`ΔScore 임계 초과 +${Math.abs(dsGap).toFixed(3)}`:`0.20까지 ${Math.abs(dsGap).toFixed(3)} 차이`;
+  const dsStateIcon=ds>=0.20?"✅":"⚠";
+  const dsActionLabel=ds>=0.20?"RED_PREP 조건 충족(유지)":"추가 에스컬레이션 시 RED_PREP 전환";
+  const confDelta=ec-effectiveThreshold;
+  const confDeltaLabel=ec>=effectiveThreshold
+    ? `Conf ${ec.toFixed(3)} ≥ ${effectiveThreshold.toFixed(3)} → RED 조건 충족`
+    : `Conf ${ec.toFixed(3)} < ${effectiveThreshold.toFixed(3)} → RED 미충족 (${Math.abs(confDelta).toFixed(3)} 차이)`;
+  const dsEscalationLabel=ds>=0.20
+    ? `ΔScore ≥ 0.20 돌파 (현재 +${(ds-0.20).toFixed(3)})`
+    : `ΔScore ≥ 0.20 돌파 (현재 ${Math.abs(0.20-ds).toFixed(3)} 차이)`;
+
+  const escalationItems=[
+    {text:"한국 대사관 'Leave immediately' 발령",active:Boolean(triggers.kr_leave_immediately),note:`현재: ${Boolean(triggers.kr_leave_immediately)?"감지됨":"미감지"}`},
+    {text:"미국 Level 4 Do Not Travel 격상",active:(Number(i01?.state)||0)>=0.95,note:`I01 state=${(Number(i01?.state)||0).toFixed(2)}`},
+    {text:"국경 RESTRICTED/CLOSED 감지",active:Boolean(triggers.border_change),note:`I04 state=${(Number(i04?.state)||0).toFixed(2)}`},
+    {text:dsEscalationLabel,active:ds>=0.20,note:`threshold=0.20`},
+    {text:"추가 대규모 strike 감지",active:Boolean(triggers.strike_detected),note:`trigger=${Boolean(triggers.strike_detected)}`},
+  ];
+  const deEscalationItems=[
+    {text:"영공 재개 + 항공 정상화",ok:airspaceState==="OPEN",note:airspaceHint||"I02 detail n/a"},
+    {text:"strike window 해제",ok:!gateStrike,note:`strike=${gateStrike?"active":"clear"}`},
+    {text:"국경 통제 해제",ok:!gateRoad,note:`border=${gateRoad?"restricted":"clear"}`},
+    {text:"Evidence 대비 Threshold 하향 안정",ok:ec<effectiveThreshold&&ds<0.20,note:`confΔ=${(ec-effectiveThreshold).toFixed(3)}`},
+  ];
+
+  return {
+    i01,i02,i03,i04,
+    hypothesesSorted,leadingHypothesis,leadingColor,
+    ds,ec,effectiveThreshold,confBand,
+    triggers,liveDegraded,
+    gateStay,gateStrike,gateRoad,gateActiveCount,gateState,
+    modeState,modeColor,
+    evidenceState,
+    airspaceState,airspaceHint,
+    h2Score,likelihoodLabel,likelihoodBand,likelihoodBasis,
+    evidenceFloorT0,
+    urgencyScore,
+    conflictStats, conflictDayLabel,
+    sourceHealthLabel, liveSource,
+    dsGapLabel, dsStateIcon, dsActionLabel, confDeltaLabel,
+    escalationItems, deEscalationItems,
+  };
+}
+
+/* =========================
+   HISTORY + TIMELINE CORE
+   ========================= */
+function computeDashboardKey(dash){
+  if(!dash || typeof dash !== "object") return "";
+  const meta = dash.metadata || {};
+  const ts = String(meta.stateTs||"");
+  const status = String(meta.status||"");
+  const degraded = meta.degraded ? "1":"0";
+  const h = Array.isArray(dash.hypotheses) ? dash.hypotheses.map(x=>`${x.id}:${Number(x.score||0).toFixed(3)}`).join("|") : "";
+  const i = Array.isArray(dash.indicators) ? dash.indicators.map(x=>`${x.id}:${Number(x.state||0).toFixed(2)}:${x.cv?1:0}:${Number(x.srcCount||0)}`).join("|") : "";
+  const r = Array.isArray(dash.routes) ? dash.routes.map(x=>`${x.id}:${x.status}:${Number(x.cong||0).toFixed(2)}`).join("|") : "";
+  const top = (dash.intelFeed||[])[0];
+  const f = top ? String(top.tsIso||top.ts||top.text||"") : "";
+  return `${ts}#${status}#${degraded}#${h}#${i}#${r}#${f}`;
+}
+
+function appendHistory(prev, dash, derived){
+  const key = computeDashboardKey(dash);
+  if(!key) return prev;
+  const last = prev[prev.length-1];
+  if(last && last.key === key) return prev;
+
+  const point = {
+    key,
+    ts: new Date().toISOString(),
+    stateTs: String(dash?.metadata?.stateTs||""),
+    scores: {
+      H0: Number((dash.hypotheses||[]).find(x=>x.id==="H0")?.score || 0),
+      H1: Number((dash.hypotheses||[]).find(x=>x.id==="H1")?.score || 0),
+      H2: Number((dash.hypotheses||[]).find(x=>x.id==="H2")?.score || 0),
+    },
+    ds: Number(derived.ds||0),
+    ec: Number(derived.ec||0),
+    thr: Number(derived.effectiveThreshold||0.8),
+    mode: derived.modeState,
+    gate: derived.gateState,
+    air: derived.airspaceState,
+    ev: derived.evidenceState,
+  };
+
+  const next = [...prev, point];
+  if(next.length > HISTORY_MAX_POINTS){
+    next.splice(0, next.length - HISTORY_MAX_POINTS);
+  }
+  return next;
+}
+
+function mkEvent({level="INFO", category="SYSTEM", title="", detail="", ts=null}){
+  return {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    ts: ts || new Date().toISOString(),
+    level, category, title, detail
+  };
+}
+
+function buildDiffEvents(prevDash, nextDash, prevDerived, nextDerived){
+  const events = [];
+  const ts = new Date().toISOString();
+  if(!prevDash || !prevDerived){
+    events.push(mkEvent({level:"INFO",category:"SYSTEM",title:"Dashboard loaded",detail:`source=${nextDash?.metadata?.source||"local"}`,ts}));
+    return events;
+  }
+  if(prevDerived.modeState !== nextDerived.modeState){
+    events.push(mkEvent({
+      level: nextDerived.modeState==="DEGRADED"?"ALERT":nextDerived.modeState==="RED_PREP"?"WARN":"INFO",
+      category:"MODE",
+      title:`MODE 변경: ${prevDerived.modeState} → ${nextDerived.modeState}`,
+      detail:`Δ=${nextDerived.ds.toFixed(3)} / Conf=${nextDerived.ec.toFixed(3)} / Gate=${nextDerived.gateState}`,
+      ts
+    }));
+  }
+  if(prevDerived.gateState !== nextDerived.gateState){
+    events.push(mkEvent({
+      level: nextDerived.gateState==="BLOCKED"?"ALERT":nextDerived.gateState==="CAUTION"?"WARN":"INFO",
+      category:"GATE",
+      title:`Gate 변경: ${prevDerived.gateState} → ${nextDerived.gateState}`,
+      detail:`active=${nextDerived.gateActiveCount}/3 (Stay=${nextDerived.gateStay?"Y":"N"}, Strike=${nextDerived.gateStrike?"Y":"N"}, Road=${nextDerived.gateRoad?"Y":"N"})`,
+      ts
+    }));
+  }
+  if(prevDerived.airspaceState !== nextDerived.airspaceState){
+    events.push(mkEvent({
+      level: nextDerived.airspaceState==="CLOSED"?"ALERT":nextDerived.airspaceState==="DISRUPTED"?"WARN":"INFO",
+      category:"AIRSPACE",
+      title:`Airspace 변경: ${prevDerived.airspaceState} → ${nextDerived.airspaceState}`,
+      detail: nextDerived.airspaceHint || "",
+      ts
+    }));
+  }
+  if(prevDerived.evidenceState !== nextDerived.evidenceState){
+    events.push(mkEvent({
+      level: nextDerived.evidenceState==="PASSED"?"INFO":"WARN",
+      category:"EVIDENCE",
+      title:`Evidence 변경: ${prevDerived.evidenceState} → ${nextDerived.evidenceState}`,
+      detail:`Conf=${nextDerived.ec.toFixed(3)} vs Thr=${nextDerived.effectiveThreshold.toFixed(3)}`,
+      ts
+    }));
+  }
+  if(prevDerived.leadingHypothesis?.id !== nextDerived.leadingHypothesis?.id){
+    events.push(mkEvent({
+      level:"WARN",
+      category:"MODE",
+      title:`Leading Hypothesis: ${prevDerived.leadingHypothesis?.id||"?"} → ${nextDerived.leadingHypothesis?.id||"?"}`,
+      detail:`${nextDerived.leadingHypothesis?.name||""}`,
+      ts
+    }));
+  }
+  if(prevDerived.ds < 0.20 && nextDerived.ds >= 0.20){
+    events.push(mkEvent({
+      level:"ALERT",
+      category:"MODE",
+      title:"ΔScore 임계 돌파",
+      detail:`ΔScore ${nextDerived.ds.toFixed(3)} ≥ 0.20`,
+      ts
+    }));
+  }
+
+  // route diffs
+  const prevRoutes = new Map((prevDash.routes||[]).map(r=>[r.id,r]));
+  for(const r of (nextDash.routes||[])){
+    const p = prevRoutes.get(r.id);
+    if(!p) continue;
+    if(p.status !== r.status){
+      events.push(mkEvent({
+        level: r.status==="BLOCKED"?"ALERT":r.status==="CAUTION"?"WARN":"INFO",
+        category:"ROUTE",
+        title:`Route ${r.id} 상태: ${p.status} → ${r.status}`,
+        detail: r.note || "",
+        ts
+      }));
+    }else{
+      const dc = Math.abs((Number(p.cong)||0)-(Number(r.cong)||0));
+      if(dc >= 0.15){
+        events.push(mkEvent({
+          level:"WARN",
+          category:"ROUTE",
+          title:`Route ${r.id} 혼잡도 변화`,
+          detail:`cong ${(Number(p.cong)||0).toFixed(2)} → ${(Number(r.cong)||0).toFixed(2)}`,
+          ts
+        }));
+      }
+    }
+  }
+
+  // intel diff (top item changes)
+  const prevTop = (prevDash.intelFeed||[])[0];
+  const nextTop = (nextDash.intelFeed||[])[0];
+  const prevKey = prevTop ? String(prevTop.tsIso||prevTop.ts||prevTop.text||"") : "";
+  const nextKey = nextTop ? String(nextTop.tsIso||nextTop.ts||nextTop.text||"") : "";
+  if(prevKey && nextKey && prevKey !== nextKey){
+    events.push(mkEvent({
+      level: nextTop.priority==="CRITICAL"?"ALERT":nextTop.priority==="HIGH"?"WARN":"INFO",
+      category:"INTEL",
+      title:`새 Intel: ${nextTop.priority}`,
+      detail: nextTop.text || "",
+      ts
+    }));
+  }
+
+  return events;
+}
+
+/* =========================
+   APP
+   ========================= */
+function App(){
+  const[now,sN]=useState(new Date());
+  const[cl,sCl]=useState(CL_INIT);
+  const[tab,sT]=useState("overview");
+  const[ne,sNe]=useState(900);
+  const[ff,sFF]=useState("ALL");
+  const[dash,sDash]=useState(INITIAL_DASHBOARD);
+  const[egressLossETA,sELA]=useState(INITIAL_DASHBOARD?.metadata?.egressLossETA ?? FALLBACK_EGRESS_LOSS_ETA);
+  const[loading,sLoading]=useState(true);
+  const[error,sError]=useState(null);
+  const[lastUpdated,sLastUpdated]=useState(null);
+
+  // NEW: history/timeline/summary + UI states
+  const [history, setHistory] = useState([]);
+  const [timeline, setTimeline] = useState([]);
+  const [selectedRouteId, setSelectedRouteId] = useState(null);
+  const [summary, setSummary] = useState({text:"", ts:null, mode:"OFFLINE"});
+  const [autoSummary, setAutoSummary] = useState(false);
+
+  const mounted=useRef(true);
+  const synced=useRef(false);
+  const prevDashRef = useRef(null);
+  const prevDerivedRef = useRef(null);
+
+  const mergeChecklist=(payloadChecklist,prevChecklist)=>{
+    return payloadChecklist.map(item=>{
+      const prev=prevChecklist.find(p=>p.id===item.id);
+      return prev?{...item,done:prev.done}:item;
+    });
+  };
+
+  const derived = useMemo(()=>deriveState(dash, egressLossETA), [dash, egressLossETA]);
+
+  // Load persisted state once
+  useEffect(()=>{
+    const rawE = Number(safeGetLS(STORAGE_KEYS.egress,""));
+    if(Number.isFinite(rawE) && rawE>=0) sELA(rawE);
+
+    const rawHist = safeGetLS(STORAGE_KEYS.history, "");
+    const parsedHist = safeJsonParse(rawHist, []);
+    if(Array.isArray(parsedHist)) setHistory(parsedHist);
+
+    const rawTl = safeGetLS(STORAGE_KEYS.timeline, "");
+    const parsedTl = safeJsonParse(rawTl, []);
+    if(Array.isArray(parsedTl)) setTimeline(parsedTl);
+
+    const a = safeGetLS(STORAGE_KEYS.autoSummary,"0");
+    setAutoSummary(a==="1");
+  }, []);
+
+  // Persist egress
+  useEffect(()=>{
+    safeSetLS(STORAGE_KEYS.egress, String(Number.isFinite(egressLossETA)?egressLossETA:FALLBACK_EGRESS_LOSS_ETA));
+  },[egressLossETA]);
+
+  // Persist history / timeline / autoSummary
+  useEffect(()=>{
+    safeSetLS(STORAGE_KEYS.history, JSON.stringify(history.slice(-HISTORY_MAX_POINTS)));
+  }, [history]);
+  useEffect(()=>{
+    safeSetLS(STORAGE_KEYS.timeline, JSON.stringify(timeline.slice(0,TIMELINE_MAX)));
+  }, [timeline]);
+  useEffect(()=>{
+    safeSetLS(STORAGE_KEYS.autoSummary, autoSummary ? "1" : "0");
+  }, [autoSummary]);
+
+  const logEvent = useCallback((ev)=>{
+    setTimeline(prev=>{
+      const next = [mkEvent(ev), ...prev];
+      return next.slice(0, TIMELINE_MAX);
+    });
+  }, []);
+
+  const applyDashboard=useCallback((next)=>{
+    const egressNext = clampEgress(next?.metadata?.egressLossETA);
+    const nextDerived = deriveState(next, egressNext);
+
+    sDash(next);
+    sCl(prev=>mergeChecklist(next.checklist,prev));
+    sELA(egressNext);
+    synced.current=true;
+
+    // history push + diff events
+    setHistory(prev=>appendHistory(prev, next, nextDerived));
+
+    const prevDash = prevDashRef.current;
+    const prevDer = prevDerivedRef.current;
+    const diff = buildDiffEvents(prevDash, next, prevDer, nextDerived);
+    if(diff.length){
+      setTimeline(prev=>{
+        const nextTL = [...diff, ...prev];
+        return nextTL.slice(0, TIMELINE_MAX);
+      });
+    }
+
+    prevDashRef.current = next;
+    prevDerivedRef.current = nextDerived;
+  },[]);
+
+  const fetchDashboard=useCallback(async(showLoading=false)=>{
+    if(showLoading) sLoading(true);
+    try{
+      let normalized=null;
+      for(const candidate of DASHBOARD_CANDIDATES){
+        try{
+          const sep = candidate.includes("?") ? "&" : "?";
+          const r=await fetch(`${candidate}${sep}t=${Date.now()}`,{cache:"no-store"});
+          if(!r.ok) continue;
+          const payload=await r.json();
+          normalized=normalizeIncomingPayload(payload);
+          if(normalized&&normalized.metadata){
+            normalized.metadata.source=candidate;
+          }
+          if(normalized) break;
+        }catch{
+          // try next
+        }
+      }
+      if(!normalized) throw new Error("Invalid payload");
+      if(!mounted.current) return;
+      applyDashboard(normalized);
+      sError(null);
+      sLastUpdated(new Date());
+    }catch(err){
+      if(!mounted.current) return;
+      if(!synced.current){
+        applyDashboard(INITIAL_DASHBOARD);
+      }
+      sError("데이터를 불러오지 못했습니다. 기본 데이터를 표시합니다.");
+      logEvent({level:"WARN",category:"SYSTEM",title:"Fetch failed → fallback",detail:String(err?.message||err||"")});
+    }finally{
+      if(showLoading && mounted.current) sLoading(false);
+    }
+  },[applyDashboard, logEvent]);
+
+  // Ticker
+  useEffect(()=>{
+    const t=setInterval(()=>{sN(new Date());sNe(p=>p<=0?900:p-1)},1000);
+    return()=>{
+      mounted.current=false;
+      clearInterval(t);
+    };
+  },[]);
+
+  // Fetch interval
+  useEffect(()=>{
+    mounted.current=true;
+    fetchDashboard(true);
+    const intervalMs=15*60*1000;
+    const id=setInterval(()=>fetchDashboard(false),intervalMs);
+    return ()=>clearInterval(id);
+  },[fetchDashboard]);
+
+  // Auto summary on new dashboard key
+  const lastSummaryKeyRef = useRef("");
+  useEffect(()=>{
+    if(!autoSummary) return;
+    const k = computeDashboardKey(dash);
+    if(!k || k === lastSummaryKeyRef.current) return;
+    lastSummaryKeyRef.current = k;
+
+    const text = buildOfflineSummary(dash, derived);
+    setSummary({text, ts:new Date().toISOString(), mode:"OFFLINE"});
+  }, [autoSummary, dash, derived]);
+
+  const tog=useCallback(id=>sCl(p=>p.map(c=>c.id===id?{...c,done:!c.done}:c)),[]);
+  const cc=cl.filter(c=>c.done).length;
+
+  const bf=2.0;
+  const fmt=s=>`${Math.floor(s/60).toString().padStart(2,"0")}:${(s%60).toString().padStart(2,"0")}`;
+
+  const tabs=[
+    {id:"overview",l:"Overview",i:"📊"},
+    {id:"analysis",l:"Trends & Log",i:"📈"},
+    {id:"intel",l:"Intel Feed",i:"🔴"},
+    {id:"indicators",l:"Indicators",i:"📡"},
+    {id:"routes",l:"Routes",i:"🗺️"},
+    {id:"sim",l:"Simulator",i:"🧪"},
+    {id:"checklist",l:"Checklist",i:"✅"},
+  ];
+
+  const updateTs=lastUpdated
+    ? lastUpdated.toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Dubai"})
+    : "—";
+
+  const gstDateTime = useMemo(()=>{
+    return now.toLocaleString("ko-KR",{timeZone:"Asia/Dubai",hour12:false});
+  }, [now]);
+
+  const formatFeedTs=(item)=>{
+    const raw=item?.tsIso || item?.ts;
+    const d=raw?new Date(raw):null;
+    if(!d||Number.isNaN(d.getTime())) return item?.ts || "—";
+    return d.toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"Asia/Dubai"});
+  };
+
+  const fFeed=ff==="ALL"?dash.intelFeed:dash.intelFeed.filter(f=>f.priority===ff);
+
+  const safeEgressLabel=Number.isFinite(egressLossETA)?`${Number(egressLossETA).toFixed(2)}h`:"미입력";
+  const stateTsLabel=dash?.metadata?.stateTs||"n/a";
+  const statusLabel=dash?.metadata?.status?String(dash.metadata.status).toUpperCase():"n/a";
+  const degradedLabel=dash?.metadata?.degraded?"true":"false";
+
+  const stat=(value,suffix="")=>Number.isFinite(value)?`${value}${suffix}`:"n/a";
+
+  // History for charts
+  const histH0 = history.map(p=>p.scores?.H0 ?? 0);
+  const histH1 = history.map(p=>p.scores?.H1 ?? 0);
+  const histH2 = history.map(p=>p.scores?.H2 ?? 0);
+  const histDs = history.map(p=>p.ds ?? 0);
+  const histEc = history.map(p=>p.ec ?? 0);
+
+  return (
+    <div style={{minHeight:"100vh",background:"#020617",color:"#e2e8f0",fontFamily:"'Inter',-apple-system,sans-serif",padding:12,maxWidth:980,margin:"0 auto"}}>
+
+      {/* HEADER */}
+      <div style={{background:"linear-gradient(135deg,#0f172a,#1e1b4b)",borderRadius:16,padding:"16px 20px",marginBottom:12,border:"1px solid #1e293b"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
+          <div>
+            <div style={{fontSize:10,color:"#64748b",letterSpacing:2,textTransform:"uppercase",marginBottom:4}}>HyIE-ERC² Personal I&W System · LIVE INTELLIGENCE</div>
+            <div style={{fontSize:22,fontWeight:800,background:"linear-gradient(90deg,#f59e0b,#fbbf24)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
+              v2026.05 — SHELTER MODE (Upgraded)
+            </div>
+            <div style={{fontSize:10,color:"#94a3b8",marginTop:4}}>
+              {`Iran-UAE Conflict ${derived.conflictDayLabel} · ${derived.conflictStats.conflict_start_date} – ongoing · source ${derived.conflictStats.source}`}
+            </div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:11,color:"#64748b"}}>Abu Dhabi, UAE (GST +4)</div>
+            <div style={{fontSize:13,fontFamily:"monospace",color:"#94a3b8"}}>{gstDateTime}</div>
+            <div style={{fontSize:11,color:"#64748b",marginTop:2}}>마지막 갱신: {updateTs}</div>
+            {loading && <div style={{fontSize:11,color:"#22c55e",marginTop:2}}>데이터 로드 중…</div>}
+            {error && <div style={{fontSize:11,color:"#fca5a5",marginTop:2}}>{error}</div>}
+            <div style={{display:"flex",alignItems:"center",gap:6,justifyContent:"flex-end",marginTop:4}}>
+              <Pulse color="#f59e0b"/>
+              <span style={{fontSize:11,color:"#f59e0b"}}>다음 평가: {fmt(ne)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ALERT BANNER */}
+      <div style={{background:"rgba(245,158,11,0.08)",border:"2px solid #f59e0b",borderRadius:12,padding:"14px 20px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:48,height:48,borderRadius:12,background:"linear-gradient(135deg,#f59e0b,#d97706)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:900,color:"#000"}}>⚠</div>
+          <div>
+            <div style={{fontSize:20,fontWeight:800,color:derived.modeColor}}>
+              {derived.modeState==="RED_PREP"?"AMBER → RED_PREP 접근 중":derived.modeState==="DEGRADED"?"DEGRADED 모니터링":"AMBER 모니터링"}
+            </div>
+            <div style={{fontSize:12,color:"#fbbf24"}}>{`MODE: ${derived.modeState} · 이동 제한 · Gate ${derived.gateState}`}</div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <Pill label="Gate" value={derived.gateState} color={derived.gateState==="BLOCKED"?"#ef4444":derived.gateState==="CAUTION"?"#f59e0b":"#22c55e"} />
+          <Pill label="Evidence" value={derived.evidenceState} color={derived.evidenceState==="PASSED"?"#22c55e":"#f59e0b"} />
+          <Pill label="Airspace" value={derived.airspaceState} color={derived.airspaceState==="OPEN"?"#22c55e":derived.airspaceState==="DISRUPTED"?"#f59e0b":"#ef4444"} />
+          <Pill label="ΔScore" value={derived.ds.toFixed(3)} color={derived.ds>=0.15?"#f59e0b":"#94a3b8"} />
+          <Pill label="Conf" value={derived.ec.toFixed(3)} color={derived.ec>=0.70?"#22c55e":"#f59e0b"} />
+        </div>
+      </div>
+
+      {/* AI SUMMARY */}
+      <Card style={{marginBottom:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:900}}>🧠 AI Situation Summary (local)</div>
+            <div style={{fontSize:10,color:"#64748b",marginTop:4}}>
+              버튼으로 즉시 생성하거나, Auto를 켜면 데이터 갱신 때마다 자동으로 업데이트됩니다.
+            </div>
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+            <label style={{display:"flex",alignItems:"center",gap:8,fontSize:11,color:"#e2e8f0",cursor:"pointer"}}>
+              <input type="checkbox" checked={autoSummary} onChange={(e)=>setAutoSummary(e.target.checked)} />
+              Auto summary
+            </label>
+            <button
+              onClick={()=>{
+                const text = buildOfflineSummary(dash, derived);
+                setSummary({text, ts:new Date().toISOString(), mode:"OFFLINE"});
+                logEvent({level:"INFO",category:"SYSTEM",title:"Summary generated",detail:`mode=${derived.modeState} gate=${derived.gateState} air=${derived.airspaceState}`});
+              }}
+              style={{background:"#0b1220",border:"1px solid #1e293b",color:"#e2e8f0",borderRadius:10,padding:"10px 12px",fontSize:11,fontWeight:900,cursor:"pointer"}}
+            >
+              Generate
+            </button>
+            <button
+              onClick={()=>copyText(summary.text)}
+              style={{background:"#14532d",border:"1px solid #166534",color:"#dcfce7",borderRadius:10,padding:"10px 12px",fontSize:11,fontWeight:900,cursor:"pointer"}}
+            >
+              Copy
+            </button>
+            <button
+              onClick={()=>setSummary({text:"",ts:null,mode:"OFFLINE"})}
+              style={{background:"#0b1220",border:"1px solid #1e293b",color:"#94a3b8",borderRadius:10,padding:"10px 12px",fontSize:11,fontWeight:800,cursor:"pointer"}}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <div style={{marginTop:12,background:"#0b1220",border:"1px solid #1e293b",borderRadius:12,padding:12}}>
+          <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",alignItems:"center"}}>
+            <div style={{fontSize:10,color:"#64748b"}}>
+              {summary.ts ? `last: ${formatTsGST(summary.ts)}` : "—"}
+            </div>
+            <div style={{fontSize:10,color:"#475569"}}>{`stateTs: ${stateTsLabel} · status: ${statusLabel} · degraded: ${degradedLabel}`}</div>
+          </div>
+          <div style={{marginTop:8,whiteSpace:"pre-wrap",fontSize:12,color:summary.text? "#e2e8f0":"#64748b"}}>
+            {summary.text || "요약이 아직 없습니다. Generate 버튼을 눌러 생성하세요."}
+          </div>
+        </div>
+      </Card>
+
+      {/* CONFLICT STATS */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:10,marginBottom:10}}>
+        <Card style={{marginBottom:0}}>
+          <div style={{fontSize:11,color:"#64748b"}}>Missiles</div>
+          <div style={{fontSize:20,fontWeight:900,fontFamily:"monospace",marginTop:4}}>{stat(derived.conflictStats.missiles_total)}</div>
+          <div style={{fontSize:10,color:"#94a3b8"}}>intercepted: {stat(derived.conflictStats.missiles_intercepted)}</div>
+        </Card>
+        <Card style={{marginBottom:0}}>
+          <div style={{fontSize:11,color:"#64748b"}}>Drones</div>
+          <div style={{fontSize:20,fontWeight:900,fontFamily:"monospace",marginTop:4}}>{stat(derived.conflictStats.drones_total)}</div>
+          <div style={{fontSize:10,color:"#94a3b8"}}>destroyed: {stat(derived.conflictStats.drones_destroyed)}</div>
+        </Card>
+        <Card style={{marginBottom:0}}>
+          <div style={{fontSize:11,color:"#64748b"}}>Casualties</div>
+          <div style={{fontSize:20,fontWeight:900,fontFamily:"monospace",marginTop:4}}>{stat(derived.conflictStats.casualties_kia)} KIA</div>
+          <div style={{fontSize:10,color:"#94a3b8"}}>{stat(derived.conflictStats.casualties_wia)} WIA</div>
+        </Card>
+        <Card style={{marginBottom:0}}>
+          <div style={{fontSize:11,color:"#64748b"}}>Source health</div>
+          <div style={{fontSize:18,fontWeight:900,fontFamily:"monospace",marginTop:4}}>{derived.sourceHealthLabel}</div>
+          <div style={{fontSize:10,color:"#94a3b8"}}>{`state source: ${derived.liveSource}`}</div>
+        </Card>
+      </div>
+
+      {/* TABS */}
+      <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:6,marginBottom:10}}>
+        {tabs.map(t=>(
+          <div
+            key={t.id}
+            onClick={()=>sT(t.id)}
+            style={{
+              flex:"0 0 auto",
+              cursor:"pointer",
+              padding:"10px 12px",
+              borderRadius:12,
+              border:`1px solid ${tab===t.id?"#f59e0b":"#1e293b"}`,
+              background: tab===t.id ? "rgba(245,158,11,0.12)" : "#0f172a",
+              color: tab===t.id ? "#fbbf24" : "#cbd5e1",
+              fontSize:12,
+              fontWeight:800
+            }}
+          >
+            {t.i} {t.l}
+          </div>
+        ))}
+      </div>
+
+      {/* OVERVIEW */}
+      {tab==="overview" && (
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:10}}>
+          {/* Hypotheses */}
+          <Card style={{marginBottom:0}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <div style={{fontSize:12,fontWeight:900}}>Hypotheses</div>
+              <div style={{fontSize:10,color:"#64748b"}}>Leading: <span style={{color:derived.leadingColor,fontWeight:900}}>{derived.leadingHypothesis.id}</span></div>
+            </div>
+            <div style={{display:"flex",gap:10,justifyContent:"space-between",alignItems:"center"}}>
+              {dash.hypotheses.map(h=>(
+                <Gauge key={h.id} value={h.score} color={h.color} label={h.id} sub={h.name}/>
+              ))}
+            </div>
+
+            <div style={{marginTop:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                <div style={{fontSize:10,color:"#64748b"}}>Trend (history)</div>
+                <div style={{fontSize:10,color:"#475569"}}>{history.length} pts</div>
+              </div>
+              <div style={{marginTop:6}}>
+                <MultiLineChart
+                  height={96}
+                  min={0}
+                  max={1}
+                  series={[
+                    {id:"H0",label:"H0",color:"#22c55e",data:histH0},
+                    {id:"H1",label:"H1",color:"#f59e0b",data:histH1},
+                    {id:"H2",label:"H2",color:"#ef4444",data:histH2},
+                  ]}
+                />
+              </div>
+            </div>
+          </Card>
+
+          {/* ICD 203 */}
+          <Card style={{marginBottom:0}}>
+            <div style={{fontSize:12,fontWeight:900}}>ICD 203 — CONFIDENCE / URGENCY</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:10}}>
+              <div style={{background:"#0b1220",border:"1px solid #1e293b",borderRadius:12,padding:12}}>
+                <div style={{fontSize:10,color:"#64748b"}}>Evidence Conf</div>
+                <div style={{fontSize:22,fontWeight:900,fontFamily:"monospace",color:derived.ec>=0.70?"#22c55e":"#f59e0b"}}>{derived.ec.toFixed(3)}</div>
+                <div style={{fontSize:10,color:"#94a3b8"}}>{derived.confBand}</div>
+                <div style={{marginTop:8,fontSize:10,color:"#64748b"}}>Threshold</div>
+                <div style={{fontSize:14,fontWeight:900,fontFamily:"monospace",color:"#fbbf24"}}>{derived.effectiveThreshold.toFixed(3)}</div>
+                <div style={{marginTop:8,fontSize:10,color:"#94a3b8"}}>{derived.confDeltaLabel}</div>
+              </div>
+              <div style={{background:"#0b1220",border:"1px solid #1e293b",borderRadius:12,padding:12}}>
+                <div style={{fontSize:10,color:"#64748b"}}>Urgency score</div>
+                <div style={{fontSize:22,fontWeight:900,fontFamily:"monospace",color:derived.urgencyScore>=0.7?"#ef4444":derived.urgencyScore>=0.4?"#f59e0b":"#22c55e"}}>{derived.urgencyScore.toFixed(2)}</div>
+                <div style={{fontSize:10,color:"#94a3b8"}}>egress loss ETA</div>
+                <div style={{display:"flex",gap:8,alignItems:"center",marginTop:6}}>
+                  <input
+                    value={egressLossETA}
+                    onChange={(e)=>sELA(clampEgress(e.target.value))}
+                    style={{width:"100%",background:"#0f172a",border:"1px solid #1e293b",borderRadius:10,color:"#e2e8f0",padding:"10px 10px",fontFamily:"monospace"}}
+                  />
+                  <div style={{fontSize:11,color:"#94a3b8",minWidth:70,textAlign:"right"}}>{safeEgressLabel}</div>
+                </div>
+                <div style={{marginTop:8,fontSize:10,color:"#64748b"}}>stateTs: <span style={{color:"#94a3b8"}}>{stateTsLabel}</span></div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Movement Gate */}
+          <Card style={{marginBottom:0}}>
+            <div style={{fontSize:12,fontWeight:900}}>Movement Gate</div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
+              <Pill label="Stay" value={derived.gateStay?"ON":"OFF"} color={derived.gateStay?"#f59e0b":"#94a3b8"} />
+              <Pill label="Strike" value={derived.gateStrike?"ON":"OFF"} color={derived.gateStrike?"#ef4444":"#94a3b8"} />
+              <Pill label="Border" value={derived.gateRoad?"ON":"OFF"} color={derived.gateRoad?"#f59e0b":"#94a3b8"} />
+              <Pill label="Gate" value={derived.gateState} color={derived.gateState==="BLOCKED"?"#ef4444":derived.gateState==="CAUTION"?"#f59e0b":"#22c55e"} />
+            </div>
+            <div style={{marginTop:12,fontSize:11,color:"#94a3b8"}}>
+              active: {derived.gateActiveCount}/3
+            </div>
+            <div style={{marginTop:10,background:"#0b1220",border:"1px solid #1e293b",borderRadius:10,padding:12,fontSize:11,color:"#e2e8f0"}}>
+              <div style={{fontWeight:900,marginBottom:6}}>{derived.dsStateIcon} {derived.dsGapLabel}</div>
+              <div style={{color:"#94a3b8"}}>{derived.dsActionLabel}</div>
+            </div>
+          </Card>
+
+          {/* Likelihood */}
+          <Card style={{marginBottom:0}}>
+            <div style={{fontSize:12,fontWeight:900}}>Likelihood (H2)</div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,marginTop:10}}>
+              <div>
+                <div style={{fontSize:22,fontWeight:900,color:derived.h2Score>=0.8?"#ef4444":derived.h2Score>=0.55?"#f59e0b":"#22c55e"}}>
+                  {derived.likelihoodLabel}
+                </div>
+                <div style={{fontSize:11,color:"#94a3b8"}}>{derived.likelihoodBand}</div>
+                <div style={{fontSize:10,color:"#64748b",marginTop:6}}>{derived.likelihoodBasis}</div>
+              </div>
+              <div style={{width:120}}>
+                <Bar value={derived.h2Score} max={1} color={derived.h2Score>=0.8?"#ef4444":derived.h2Score>=0.55?"#f59e0b":"#22c55e"} h={10}/>
+              </div>
+            </div>
+          </Card>
+
+          {/* Escalation */}
+          <Card style={{marginBottom:0}}>
+            <div style={{fontSize:12,fontWeight:900}}>🔺 Escalation Signals</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:12}}>
+              {derived.escalationItems.map((item, idx)=>(
+                <div key={idx} style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",padding:"10px 12px",borderRadius:10,border:`1px solid ${item.active?"#7c2d12":"#1e293b"}`,background:item.active?"rgba(245,158,11,0.10)":"#0b1220"}}>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:900,color:item.active?"#fbbf24":"#e2e8f0"}}>{item.text}</div>
+                    <div style={{fontSize:10,color:"#94a3b8",marginTop:4}}>{item.note}</div>
+                  </div>
+                  <div style={{fontSize:12,fontWeight:900,color:item.active?"#f59e0b":"#64748b"}}>{item.active?"ACTIVE":"—"}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* De-escalation */}
+          <Card style={{marginBottom:0}}>
+            <div style={{fontSize:12,fontWeight:900}}>🟢 De-escalation Checklist</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:12}}>
+              {derived.deEscalationItems.map((item, idx)=>(
+                <div key={idx} style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",padding:"10px 12px",borderRadius:10,border:`1px solid ${item.ok?"#14532d":"#1e293b"}`,background:item.ok?"rgba(34,197,94,0.08)":"#0b1220"}}>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:900,color:item.ok?"#86efac":"#e2e8f0"}}>{item.text}</div>
+                    <div style={{fontSize:10,color:"#94a3b8",marginTop:4}}>{item.note}</div>
+                  </div>
+                  <div style={{fontSize:12,fontWeight:900,color:item.ok?"#22c55e":"#64748b"}}>{item.ok?"OK":"—"}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ANALYSIS TAB: Trends + Timeline */}
+      {tab==="analysis" && (
+        <div>
+          <Card>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:900}}>📈 Hypothesis Trend Graph</div>
+                <div style={{fontSize:10,color:"#64748b",marginTop:4}}>최근 {history.length} 포인트 (최대 {HISTORY_MAX_POINTS})</div>
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <button
+                  onClick={()=>{
+                    setHistory([]);
+                    logEvent({level:"INFO",category:"SYSTEM",title:"History cleared"});
+                  }}
+                  style={{background:"#0b1220",border:"1px solid #1e293b",color:"#94a3b8",borderRadius:10,padding:"10px 12px",fontSize:11,fontWeight:900,cursor:"pointer"}}
+                >
+                  Reset history
+                </button>
+              </div>
+            </div>
+
+            <div style={{marginTop:12}}>
+              <MultiLineChart
+                height={160}
+                min={0}
+                max={1}
+                series={[
+                  {id:"H0",label:"H0",color:"#22c55e",data:histH0},
+                  {id:"H1",label:"H1",color:"#f59e0b",data:histH1},
+                  {id:"H2",label:"H2",color:"#ef4444",data:histH2},
+                ]}
+              />
+            </div>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:12}}>
+              <div>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#64748b",marginBottom:6}}>
+                  <span>ΔScore trend</span><span style={{fontFamily:"monospace"}}>{derived.ds.toFixed(3)}</span>
+                </div>
+                <Sparkline data={histDs} min={-0.2} max={0.6} color="#f59e0b"/>
+              </div>
+              <div>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:10,color:"#64748b",marginBottom:6}}>
+                  <span>EvidenceConf trend</span><span style={{fontFamily:"monospace"}}>{derived.ec.toFixed(3)}</span>
+                </div>
+                <Sparkline data={histEc} min={0} max={1} color="#22c55e"/>
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <TimelinePanel
+              timeline={timeline}
+              onClear={()=>{
+                setTimeline([]);
+                logEvent({level:"INFO",category:"SYSTEM",title:"Timeline cleared"});
+              }}
+              onExport={()=>{
+                const text = JSON.stringify(timeline, null, 2);
+                copyText(text);
+                logEvent({level:"INFO",category:"SYSTEM",title:"Timeline exported (copied to clipboard)"});
+              }}
+            />
+          </Card>
+        </div>
+      )}
+
+      {/* INTEL */}
+      {tab==="intel" && (
+        <Card>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:900}}>Intel Feed</div>
+              <div style={{fontSize:10,color:"#64748b",marginTop:4}}>filter: {ff}</div>
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {["ALL","CRITICAL","HIGH","MEDIUM"].map(p=>(
+                <button
+                  key={p}
+                  onClick={()=>sFF(p)}
+                  style={{
+                    background: ff===p ? "rgba(59,130,246,0.15)" : "#0b1220",
+                    border:`1px solid ${ff===p?"#3b82f6":"#1e293b"}`,
+                    color: ff===p ? "#93c5fd" : "#cbd5e1",
+                    borderRadius:10,
+                    padding:"10px 12px",
+                    fontSize:11,
+                    fontWeight:900,
+                    cursor:"pointer"
+                  }}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:12}}>
+            {fFeed.map((item, idx)=>{
+              const c=pC[item.priority]||"#94a3b8";
+              return (
+                <div key={idx} style={{background:"#0b1220",border:"1px solid #1e293b",borderRadius:12,padding:14}}>
+                  <div style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                    <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                      <span style={{width:10,height:10,borderRadius:"50%",background:c}}></span>
+                      <span style={{fontSize:11,fontWeight:900,color:c}}>{item.priority}</span>
+                      {item.verified && <span style={{fontSize:10,background:"#14532d",border:"1px solid #166534",color:"#dcfce7",padding:"2px 8px",borderRadius:999,fontWeight:900}}>VERIFIED</span>}
+                    </div>
+                    <div style={{fontSize:10,color:"#64748b"}}>{formatFeedTs(item)}</div>
+                  </div>
+                  <div style={{fontSize:13,fontWeight:800,color:"#e2e8f0",marginTop:10}}>{item.text}</div>
+                  <div style={{fontSize:11,color:"#94a3b8",marginTop:8}}>출처: {item.src}</div>
+                  <div style={{fontSize:10,color:"#64748b",marginTop:6}}>impact: {item.impact}</div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {/* INDICATORS */}
+      {tab==="indicators" && (
+        <Card>
+          <div style={{fontSize:13,fontWeight:900,marginBottom:10}}>Indicators</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {dash.indicators.map(ind=>{
+              const score=Number(ind.state)||0;
+              return (
+                <div key={ind.id} style={{background:"#0b1220",border:"1px solid #1e293b",borderRadius:12,padding:14}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                    <div>
+                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                        <span style={{fontSize:12,fontWeight:900,color:"#e2e8f0"}}>{ind.id} · {ind.name}</span>
+                        <span style={{fontSize:10,color:"#64748b"}}>{ind.tier}</span>
+                        {ind.cv
+                          ? <span style={{fontSize:10,background:"#14532d",border:"1px solid #166534",color:"#dcfce7",padding:"2px 8px",borderRadius:999,fontWeight:900}}>CV</span>
+                          : <span style={{fontSize:10,background:"#7c2d12",border:"1px solid #9a3412",color:"#fed7aa",padding:"2px 8px",borderRadius:999,fontWeight:900}}>LOW EVIDENCE</span>
+                        }
+                      </div>
+                      <div style={{fontSize:10,color:"#64748b",marginTop:6}}>state: <span style={{fontFamily:"monospace",color:"#94a3b8"}}>{score.toFixed(2)}</span></div>
+                    </div>
+                    <div style={{minWidth:160}}>
+                      <Bar value={score} max={1} color={score>=0.8?"#ef4444":score>=0.5?"#f59e0b":"#22c55e"} h={8}/>
+                    </div>
+                  </div>
+                  <div style={{fontSize:11,color:"#cbd5e1",marginTop:10}}>{ind.detail}</div>
+                  <div style={{fontSize:10,color:"#64748b",marginTop:6}}>출처: {ind.src} · 최신: {formatFeedTs(ind)} · 소스 {Math.max(ind.srcCount||0,0)}건</div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{background:"#0b1220",border:"1px solid #1e293b",borderRadius:12,padding:14,marginTop:12}}>
+            <div style={{fontSize:12,fontWeight:900,color: derived.evidenceFloorT0>=3?"#22c55e":"#f59e0b"}}>
+              {derived.evidenceFloorT0>=3 ? "✅ Evidence Floor PASSED" : "⚠ Evidence Floor not reached"}
+              {` — TIER0 교차검증: ${derived.evidenceFloorT0}건`}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* ROUTES */}
+      {tab==="routes" && (
+        <div>
+          <Card>
+            <RouteMap
+              routes={dash.routes}
+              selectedId={selectedRouteId}
+              onSelect={(rid)=>setSelectedRouteId(prev=>prev===rid?null:rid)}
+            />
+            {selectedRouteId && (
+              <div style={{marginTop:12,background:"#0b1220",border:"1px solid #1e293b",borderRadius:12,padding:12}}>
+                <div style={{fontSize:12,fontWeight:900}}>Selected Route: {selectedRouteId}</div>
+                <div style={{fontSize:10,color:"#64748b",marginTop:6}}>
+                  아래 카드에서 {selectedRouteId}가 하이라이트됩니다.
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {dash.routes.map(r=>{
+            const eff=r.base_h*(1+r.cong)*bf;
+            const isBlocked=r.status==="BLOCKED";
+            const isCaution=r.status==="CAUTION";
+            const borderColor = selectedRouteId===r.id ? "#3b82f6" : (isBlocked?"#7f1d1d":isCaution?"#92400e":"#1e293b");
+            const badgeBg=isBlocked?"#7f1d1d":isCaution?"#92400e":"#14532d";
+            const statusColor=isBlocked?"#f87171":isCaution?"#f59e0b":"#22c55e";
+            return (
+              <div key={r.id} style={{background:"#0f172a",border:`2px solid ${borderColor}`,borderRadius:12,padding:16,marginBottom:10,opacity:isBlocked?0.82:1}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{width:28,height:28,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",background:badgeBg,fontSize:13,fontWeight:900,color:"#fff"}}>{r.id}</span>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:900,color:"#e2e8f0"}}>{r.name}</div>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontSize:10,color:statusColor,fontWeight:900}}>{r.status}</span>
+                        {isBlocked && <span style={{fontSize:9,background:"#7f1d1d",color:"#fca5a5",padding:"2px 6px",borderRadius:6,fontWeight:900}}>⛔ 사용금지</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:18,fontWeight:900,fontFamily:"monospace",color:isBlocked?"#f87171":"#e2e8f0"}}>{isBlocked?"—":eff.toFixed(1)+"h"}</div>
+                    <div style={{fontSize:10,color:"#64748b"}}>{isBlocked?"차단":"effective lead"}</div>
+                  </div>
+                </div>
+
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:8}}>
+                  <div style={{background:"#1e293b",borderRadius:10,padding:10,textAlign:"center"}}>
+                    <div style={{fontSize:10,color:"#64748b"}}>Base</div>
+                    <div style={{fontSize:14,fontWeight:900,fontFamily:"monospace",color:"#94a3b8"}}>{r.base_h}h</div>
+                  </div>
+                  <div style={{background:"#1e293b",borderRadius:10,padding:10,textAlign:"center"}}>
+                    <div style={{fontSize:10,color:"#64748b"}}>Congestion</div>
+                    <div style={{fontSize:14,fontWeight:900,fontFamily:"monospace",color:r.cong>0.5?"#f87171":r.cong>0.3?"#f59e0b":"#94a3b8"}}>x{(1+r.cong).toFixed(2)}</div>
+                  </div>
+                  <div style={{background:"#1e293b",borderRadius:10,padding:10,textAlign:"center"}}>
+                    <div style={{fontSize:10,color:"#64748b"}}>Buffer</div>
+                    <div style={{fontSize:14,fontWeight:900,fontFamily:"monospace",color:"#f59e0b"}}>x{bf.toFixed(1)}</div>
+                  </div>
+                </div>
+
+                <div style={{fontSize:10,color:"#94a3b8",background:"#0b1220",border:"1px solid #1e293b",borderRadius:10,padding:10,marginBottom:(r.newsRefs&&r.newsRefs.length)?10:0}}>
+                  {r.note}
+                </div>
+
+                {r.newsRefs && r.newsRefs.length>0 && (
+                  <div style={{background:"#0a0f1a",border:"1px solid #1e3a5f",borderRadius:10,padding:10}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                      <span style={{fontSize:10,color:"#93c5fd",fontWeight:900}}>References</span>
+                      <span style={{fontSize:10,color:"#475569"}}>{r.newsRefs.length} items</span>
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {r.newsRefs.map((n,idx)=>(
+                        <div key={idx} style={{display:"flex",justifyContent:"space-between",gap:10,flexWrap:"wrap",border:"1px solid #0f172a",borderRadius:10,padding:"8px 10px",background:"#0b1220"}}>
+                          <div style={{fontSize:11,color:"#e2e8f0"}}><span style={{color:"#93c5fd",fontWeight:900}}>{n.src}</span> — {n.text}</div>
+                          <div style={{fontSize:10,color:"#64748b"}}>{n.ts}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* SIMULATOR */}
+      {tab==="sim" && (
+        <Simulator
+          liveDash={dash}
+          liveDerived={derived}
+          onLog={(ev)=>logEvent(ev)}
+        />
+      )}
+
+      {/* CHECKLIST */}
+      {tab==="checklist" && (
+        <Card>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:900}}>Checklist</div>
+              <div style={{fontSize:10,color:"#64748b",marginTop:4}}>click to toggle</div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{fontSize:22,fontWeight:900,fontFamily:"monospace",color:cc===cl.length?"#22c55e":"#f59e0b"}}>{cc}/{cl.length}</div>
+            </div>
+          </div>
+          <div style={{marginTop:10}}>
+            <Bar value={cc} max={cl.length} color={cc===cl.length?"#22c55e":"#f59e0b"} h={8}/>
+          </div>
+
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:12}}>
+            {cl.map(c=>(
+              <div
+                key={c.id}
+                onClick={()=>tog(c.id)}
+                style={{
+                  display:"flex",
+                  alignItems:"center",
+                  gap:12,
+                  background:c.done?"rgba(34,197,94,0.05)":"#0b1220",
+                  border:`1px solid ${c.done?"#14532d":"#1e293b"}`,
+                  borderRadius:12,
+                  padding:"12px 14px",
+                  cursor:"pointer"
+                }}
+              >
+                <div style={{width:22,height:22,borderRadius:8,border:`2px solid ${c.done?"#22c55e":"#334155"}`,display:"flex",alignItems:"center",justifyContent:"center",background:c.done?"#22c55e":"transparent"}}>
+                  {c.done && <span style={{color:"#000",fontSize:12,fontWeight:900}}>✓</span>}
+                </div>
+                <span style={{fontSize:13,color:c.done?"#86efac":"#e2e8f0",textDecoration:c.done?"line-through":"none",opacity:c.done?0.7:1}}>
+                  {c.text}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* FOOTER */}
+      <div style={{marginTop:16,padding:"10px 16px",background:"#0f172a",borderRadius:12,border:"1px solid #1e293b",fontSize:10,color:"#475569"}}>
+        <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:4}}>
+          <span>HyIE-ERC² v2026.05 · ICD 203 · Samsung C&amp;T Logistics</span>
+          <span>경보 시점 = 출구 상실 시점 − (대피 소요 × 버퍼)</span>
+        </div>
+        <div style={{marginTop:6,color:"#334155",fontSize:9}}>
+          {`Source health: ${derived.sourceHealthLabel} · state source: ${derived.liveSource} · conflict_stats: ${derived.conflictStats.source}`}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

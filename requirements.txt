@@ -1,0 +1,15 @@
+playwright
+apscheduler
+python-telegram-bot
+structlog
+polars
+python-dotenv
+tenacity
+notebooklm-mcp-cli
+httpx
+beautifulsoup4
+pydantic-settings
+feedparser
+fastapi
+uvicorn
+psycopg[binary]>=3.1.18
