@@ -1,5 +1,6 @@
 import React from "react";
 
+import DashboardAside from "./components/DashboardAside.jsx";
 import DashboardHeader from "./components/DashboardHeader.jsx";
 import Simulator from "./components/Simulator.jsx";
 import ShortcutsOverlay from "./components/ShortcutsOverlay.jsx";
@@ -14,11 +15,10 @@ import { useDashboardData } from "./hooks/useDashboardData.js";
 
 export default function App() {
   const dashboard = useDashboardData();
-  const activeTab = dashboard.tabs.find((tab) => tab.id === dashboard.tab);
+  let tabContent = null;
 
-  let mainContent = null;
   if (dashboard.tab === "overview") {
-    mainContent = (
+    tabContent = (
       <OverviewTab
         dash={dashboard.dash}
         derived={dashboard.derived}
@@ -33,7 +33,7 @@ export default function App() {
       />
     );
   } else if (dashboard.tab === "analysis") {
-    mainContent = (
+    tabContent = (
       <AnalysisTab
         history={dashboard.history}
         derived={dashboard.derived}
@@ -51,7 +51,7 @@ export default function App() {
       />
     );
   } else if (dashboard.tab === "intel") {
-    mainContent = (
+    tabContent = (
       <IntelTab
         allIntelFeed={dashboard.dash.intelFeed || []}
         filteredIntelFeed={dashboard.filteredIntelFeed}
@@ -60,11 +60,9 @@ export default function App() {
       />
     );
   } else if (dashboard.tab === "indicators") {
-    mainContent = (
-      <IndicatorsTab indicators={dashboard.dash.indicators || []} derived={dashboard.derived} />
-    );
+    tabContent = <IndicatorsTab indicators={dashboard.dash.indicators || []} derived={dashboard.derived} />;
   } else if (dashboard.tab === "routes") {
-    mainContent = (
+    tabContent = (
       <RoutesTab
         routes={dashboard.dash.routes || []}
         routeGeo={dashboard.dash.routeGeo}
@@ -73,9 +71,9 @@ export default function App() {
       />
     );
   } else if (dashboard.tab === "sim") {
-    mainContent = <Simulator liveDash={dashboard.dash} onLog={dashboard.logEvent} />;
+    tabContent = <Simulator liveDash={dashboard.dash} onLog={dashboard.logEvent} />;
   } else if (dashboard.tab === "checklist") {
-    mainContent = (
+    tabContent = (
       <ChecklistTab
         checklist={dashboard.dash.checklist || []}
         onToggleChecklist={dashboard.toggleChecklist}
@@ -85,64 +83,72 @@ export default function App() {
   }
 
   return (
-    <div className="dash-container dashboard-shell">
-      <DashboardHeader
-        derived={dashboard.derived}
-        error={dashboard.error}
-        gstDateTime={dashboard.gstDateTime}
-        updateTs={dashboard.updateTs}
-        nextEta={dashboard.nextEta}
-        fastCountdownSeconds={dashboard.fastCountdownSeconds}
-        lagLabel={dashboard.lagLabel}
-        onRefresh={() => dashboard.fetchLatestState(true)}
-        notifEnabled={dashboard.notifEnabled}
-        onToggleNotifications={dashboard.toggleNotifications}
-        soundEnabled={dashboard.soundEnabled}
-        onToggleSound={dashboard.toggleSound}
-        onToggleShortcuts={() => dashboard.setShowShortcuts((prev) => !prev)}
-        usingCachedData={dashboard.usingCachedData}
-        cachedAt={dashboard.cachedAt}
-        isOffline={dashboard.isOffline}
-        stateTs={dashboard.dash?.metadata?.stateTs}
-        sourceHealthLabel={dashboard.derived.sourceHealthLabel}
-        liveConnectionStatus={dashboard.liveConnectionStatus}
-      />
+    <div className="dash-container">
+      <div className="dashboard-shell">
+        <header className="dashboard-shell__header">
+          <DashboardHeader
+            derived={dashboard.derived}
+            error={dashboard.error}
+            gstDateTime={dashboard.gstDateTime}
+            updateTs={dashboard.updateTs}
+            nextEta={dashboard.nextEta}
+            fastCountdownSeconds={dashboard.fastCountdownSeconds}
+            lagLabel={dashboard.lagLabel}
+            onRefresh={() => dashboard.fetchLatestState(true)}
+            notifEnabled={dashboard.notifEnabled}
+            onToggleNotifications={dashboard.toggleNotifications}
+            soundEnabled={dashboard.soundEnabled}
+            onToggleSound={dashboard.toggleSound}
+            onToggleShortcuts={() => dashboard.setShowShortcuts((prev) => !prev)}
+            usingCachedData={dashboard.usingCachedData}
+            cachedAt={dashboard.cachedAt}
+            isOffline={dashboard.isOffline}
+            stateTs={dashboard.dash?.metadata?.stateTs}
+            sourceHealthLabel={dashboard.derived.sourceHealthLabel}
+            liveConnectionStatus={dashboard.liveConnectionStatus}
+          />
+        </header>
 
-      <div className="tab-bar-sticky-wrap">
-        <TabBar tabs={dashboard.tabs} activeTab={dashboard.tab} onChange={dashboard.setTab} />
-      </div>
+        <div className="dashboard-shell__tabs">
+          <TabBar tabs={dashboard.tabs} activeTab={dashboard.tab} onChange={dashboard.setTab} />
+        </div>
 
-      <div className="dashboard-content-grid">
-        <main className="dashboard-main">{mainContent}</main>
-        <aside className="dashboard-aside">
-          <div className="card-shell dashboard-aside-card">
-            <div className="section-title">현재 섹션</div>
-            <div className="dashboard-aside-value">{activeTab?.icon} {activeTab?.label}</div>
-            <div className="microcopy">활성 탭에 맞춰 메인 카드 구성이 동적으로 전환됩니다.</div>
-          </div>
-          <div className="card-shell dashboard-aside-card">
-            <div className="section-title">상태 요약</div>
-            <div className="dashboard-aside-kv section-gap-top">
-              <span className="pill__label">Source</span>
-              <span className="pill__value">{dashboard.derived.liveSource}</span>
-            </div>
-            <div className="dashboard-aside-kv">
-              <span className="pill__label">Health</span>
-              <span className="pill__value">{dashboard.derived.sourceHealthLabel}</span>
-            </div>
-            <div className="dashboard-aside-kv">
-              <span className="pill__label">Lag</span>
-              <span className="pill__value">{dashboard.lagLabel}</span>
-            </div>
-          </div>
-        </aside>
+        <div className="dashboard-content">
+          <main className="dashboard-main">
+            <section
+              className={`dashboard-tab-panel dashboard-tab-panel--${dashboard.tab}`}
+              role="tabpanel"
+              id={`panel-${dashboard.tab}`}
+              aria-labelledby={`tab-${dashboard.tab}`}
+            >
+              {tabContent}
+            </section>
+          </main>
+
+          <aside className="dashboard-aside">
+            <DashboardAside
+              tabs={dashboard.tabs}
+              activeTab={dashboard.tab}
+              dash={dashboard.dash}
+              derived={dashboard.derived}
+              usableRoutes={dashboard.usableRoutes}
+              timeline={dashboard.timeline}
+              history={dashboard.history}
+              selectedHistoryIndex={dashboard.selectedHistoryIndex}
+              intelFilter={dashboard.intelFilter}
+              filteredIntelFeed={dashboard.filteredIntelFeed}
+              summary={dashboard.summary}
+              selectedRouteId={dashboard.selectedRouteId}
+            />
+          </aside>
+        </div>
+
+        <div className="dashboard-footer">
+          {dashboard.loading ? "loading…" : "ready"} · source: {dashboard.derived.liveSource} · sourceHealth: {dashboard.derived.sourceHealthLabel} · conflict_stats: {dashboard.derived.conflictSourceLabel} · lag: {dashboard.lagLabel}
+        </div>
       </div>
 
       <ShortcutsOverlay visible={dashboard.showShortcuts} onClose={() => dashboard.setShowShortcuts(false)} />
-
-      <div className="dashboard-footer">
-        {dashboard.loading ? "loading…" : "ready"} · source: {dashboard.derived.liveSource} · sourceHealth: {dashboard.derived.sourceHealthLabel} · conflict_stats: {dashboard.derived.conflictSourceLabel} · lag: {dashboard.lagLabel}
-      </div>
     </div>
   );
 }
