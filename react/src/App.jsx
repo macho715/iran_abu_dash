@@ -42,68 +42,84 @@ export default function App() {
       <TabBar tabs={dashboard.tabs} activeTab={dashboard.tab} onChange={dashboard.setTab} />
 
       {dashboard.tab === "overview" && (
-        <OverviewTab
-          dash={dashboard.dash}
-          derived={dashboard.derived}
-          usableRoutes={dashboard.usableRoutes}
-          egressLossETA={dashboard.egressLossETA}
-          summary={dashboard.summary}
-          autoSummary={dashboard.autoSummary}
-          onToggleAutoSummary={dashboard.setAutoSummary}
-          onGenerateSummary={dashboard.generateSummary}
-          onCopySummary={dashboard.copySummary}
-          onExportReport={dashboard.exportReport}
-        />
+        <section role="tabpanel" id="panel-overview" aria-labelledby="tab-overview">
+          <OverviewTab
+            dash={dashboard.dash}
+            derived={dashboard.derived}
+            usableRoutes={dashboard.usableRoutes}
+            egressLossETA={dashboard.egressLossETA}
+            summary={dashboard.summary}
+            autoSummary={dashboard.autoSummary}
+            onToggleAutoSummary={dashboard.setAutoSummary}
+            onGenerateSummary={dashboard.generateSummary}
+            onCopySummary={dashboard.copySummary}
+            onExportReport={dashboard.exportReport}
+          />
+        </section>
       )}
 
       {dashboard.tab === "analysis" && (
-        <AnalysisTab
-          history={dashboard.history}
-          derived={dashboard.derived}
-          timeline={dashboard.timeline}
-          histH0={dashboard.histH0}
-          histH1={dashboard.histH1}
-          histH2={dashboard.histH2}
-          histDs={dashboard.histDs}
-          histEc={dashboard.histEc}
-          onClearHistory={dashboard.clearHistory}
-          onClearTimeline={dashboard.clearTimeline}
-          onExportTimeline={dashboard.exportTimeline}
-          selectedHistoryIndex={dashboard.selectedHistoryIndex}
-          onSelectHistoryIndex={dashboard.setSelectedHistoryIndex}
-        />
+        <section role="tabpanel" id="panel-analysis" aria-labelledby="tab-analysis">
+          <AnalysisTab
+            history={dashboard.history}
+            derived={dashboard.derived}
+            timeline={dashboard.timeline}
+            histH0={dashboard.histH0}
+            histH1={dashboard.histH1}
+            histH2={dashboard.histH2}
+            histDs={dashboard.histDs}
+            histEc={dashboard.histEc}
+            onClearHistory={dashboard.clearHistory}
+            onClearTimeline={dashboard.clearTimeline}
+            onExportTimeline={dashboard.exportTimeline}
+            selectedHistoryIndex={dashboard.selectedHistoryIndex}
+            onSelectHistoryIndex={dashboard.setSelectedHistoryIndex}
+          />
+        </section>
       )}
 
       {dashboard.tab === "intel" && (
-        <IntelTab
-          allIntelFeed={dashboard.dash.intelFeed || []}
-          filteredIntelFeed={dashboard.filteredIntelFeed}
-          intelFilter={dashboard.intelFilter}
-          onFilterChange={dashboard.setIntelFilter}
-        />
+        <section role="tabpanel" id="panel-intel" aria-labelledby="tab-intel">
+          <IntelTab
+            allIntelFeed={dashboard.dash.intelFeed || []}
+            filteredIntelFeed={dashboard.filteredIntelFeed}
+            intelFilter={dashboard.intelFilter}
+            onFilterChange={dashboard.setIntelFilter}
+          />
+        </section>
       )}
 
       {dashboard.tab === "indicators" && (
-        <IndicatorsTab indicators={dashboard.dash.indicators || []} derived={dashboard.derived} />
+        <section role="tabpanel" id="panel-indicators" aria-labelledby="tab-indicators">
+          <IndicatorsTab indicators={dashboard.dash.indicators || []} derived={dashboard.derived} />
+        </section>
       )}
 
       {dashboard.tab === "routes" && (
-        <RoutesTab
-          routes={dashboard.dash.routes || []}
-          routeGeo={dashboard.dash.routeGeo}
-          selectedRouteId={dashboard.selectedRouteId}
-          onSelectRouteId={dashboard.setSelectedRouteId}
-        />
+        <section role="tabpanel" id="panel-routes" aria-labelledby="tab-routes">
+          <RoutesTab
+            routes={dashboard.dash.routes || []}
+            routeGeo={dashboard.dash.routeGeo}
+            selectedRouteId={dashboard.selectedRouteId}
+            onSelectRouteId={dashboard.setSelectedRouteId}
+          />
+        </section>
       )}
 
-      {dashboard.tab === "sim" && <Simulator liveDash={dashboard.dash} onLog={dashboard.logEvent} />}
+      {dashboard.tab === "sim" && (
+        <section role="tabpanel" id="panel-sim" aria-labelledby="tab-sim">
+          <Simulator liveDash={dashboard.dash} onLog={dashboard.logEvent} />
+        </section>
+      )}
 
       {dashboard.tab === "checklist" && (
-        <ChecklistTab
-          checklist={dashboard.dash.checklist || []}
-          onToggleChecklist={dashboard.toggleChecklist}
-          onResetChecklist={dashboard.resetChecklist}
-        />
+        <section role="tabpanel" id="panel-checklist" aria-labelledby="tab-checklist">
+          <ChecklistTab
+            checklist={dashboard.dash.checklist || []}
+            onToggleChecklist={dashboard.toggleChecklist}
+            onResetChecklist={dashboard.resetChecklist}
+          />
+        </section>
       )}
 
       <ShortcutsOverlay visible={dashboard.showShortcuts} onClose={() => dashboard.setShowShortcuts(false)} />
