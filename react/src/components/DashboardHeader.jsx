@@ -1,6 +1,7 @@
 import React from "react";
 import { Pill } from "./ui.jsx";
 import { formatDateTimeGST } from "../lib/utils.js";
+import { getRouteStatusTheme } from "../lib/statusTheme.js";
 
 function connectionBadgeConfig(status) {
   if (status === "connected") {
@@ -55,6 +56,8 @@ export default function DashboardHeader({
   const staleConfig = staleBannerConfig(derived.staleSeverity);
   const liveLagMinutes = derived.liveLagMinutes ?? Math.floor((derived.liveLagSeconds || 0) / 60);
   const connectionBadge = connectionBadgeConfig(liveConnectionStatus);
+  const gateTheme = getRouteStatusTheme(derived.gateState);
+  const airspaceTheme = getRouteStatusTheme(derived.airspaceState === "DISRUPTED" ? "CAUTION" : derived.airspaceState);
 
   return (
     <>
@@ -119,12 +122,12 @@ export default function DashboardHeader({
             <Pill
               label="Gate"
               value={derived.gateState}
-              color={derived.gateState === "BLOCKED" ? "#ef4444" : derived.gateState === "CAUTION" ? "#f59e0b" : "#22c55e"}
+              color={gateTheme.textColor}
             />
             <Pill
               label="I02"
               value={`${derived.airspaceState}/${derived.airspaceSegment}`}
-              color={derived.airspaceState === "OPEN" ? "#22c55e" : derived.airspaceState === "DISRUPTED" ? "#f59e0b" : "#ef4444"}
+              color={airspaceTheme.textColor}
             />
             <button className="action-button" onClick={onRefresh}>🔄 Refresh</button>
             <button className={`action-button ${notifEnabled ? "is-active" : ""}`} onClick={onToggleNotifications}>

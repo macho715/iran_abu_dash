@@ -889,3 +889,156 @@ textarea:focus-visible {
     padding: 14px;
   }
 }
+
+.is-critical {
+  color: #fda4af;
+}
+
+.is-high {
+  color: #fdba74;
+}
+
+.is-caution {
+  color: #fcd34d;
+}
+
+.is-blocked {
+  color: #fecaca;
+}
+
+.is-repeated {
+  color: #cbd5e1;
+}
+
+.is-normal {
+  color: #86efac;
+}
+
+.assumption-card.is-caution {
+  background: rgba(180, 83, 9, 0.16);
+  border-color: #b45309;
+}
+
+.assumption-card.is-repeated {
+  background: var(--surface-nested);
+  border-color: var(--border-default);
+}
+
+.status-chip.is-critical,
+.status-chip.is-high,
+.status-chip.is-caution,
+.status-chip.is-blocked,
+.status-chip.is-normal,
+.status-chip.is-repeated {
+  border-color: currentColor;
+  background: rgba(30, 41, 59, 0.85);
+}
+
+.route-card.is-selected {
+  border-color: #3b82f6;
+}
+
+.route-card.is-blocked {
+  border-color: #7f1d1d;
+  background: rgba(127, 29, 29, 0.1);
+  opacity: 0.82;
+}
+
+.route-card.is-caution {
+  border-color: #92400e;
+}
+
+.route-card.is-normal {
+  border-color: #1e293b;
+}
+
+.route-card.is-blocked .route-card__badge {
+  background: #7f1d1d;
+}
+
+.route-card.is-caution .route-card__badge {
+  background: #78350f;
+}
+
+.route-card.is-normal .route-card__badge {
+  background: #14532d;
+}
+
+.intel-card.is-critical {
+  border-left: 3px solid #ef4444;
+}
+
+.intel-card.is-repeated {
+  opacity: 0.72;
+}
+
+.status-tag {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.status-tag.is-repeated {
+  background: rgba(71, 85, 105, 0.35);
+  color: #cbd5e1;
+}
+
+.inline-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.map-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.map-title {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.map-subtitle {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.legend-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.tooltip-title {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tooltip-body {
+  font-size: 11px;
+}
+
+.tooltip-meta {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.tooltip-meta--mono {
+  font-family: monospace;
+}
+
+.tooltip-error {
+  font-size: 10px;
+  color: #fecaca;
+  margin-top: 4px;
+}

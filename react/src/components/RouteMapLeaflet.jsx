@@ -6,6 +6,7 @@ import { ROUTE_BUFFER_FACTOR } from "../lib/constants.js";
 import { fetchRouteGeometryCached, resolveRouteWaypoints } from "../lib/routeApi.js";
 import { DEFAULT_ROUTE_GEO } from "../lib/routeGeoDefault.js";
 import { getRouteEffectiveHours, hasExplicitRouteEffectiveHours } from "../lib/utils.js";
+import { getRouteStatusTheme } from "../lib/statusTheme.js";
 
 function FitBounds({ latlngs = [] }) {
   const map = useMap();
@@ -42,12 +43,6 @@ function flattenLatLngs(routeGeo, resolvedLines) {
   });
 
   return all;
-}
-
-function colorForStatus(status = "OPEN") {
-  if (status === "BLOCKED") return "#ef4444";
-  if (status === "CAUTION") return "#f59e0b";
-  return "#22c55e";
 }
 
 export default function RouteMapLeaflet({
@@ -127,17 +122,17 @@ export default function RouteMapLeaflet({
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+      <div className="map-header">
         <div>
-          <div style={{ fontSize: 13, fontWeight: 900 }}>🗺️ Route Map (actual roads)</div>
-          <div style={{ fontSize: 10, color: "#64748b", marginTop: 4 }}>
+          <div className="map-title">🗺️ Route Map (actual roads)</div>
+          <div className="map-subtitle">
             OSRM first, Mapbox fallback. If both fail, waypoint straight-line is used.
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 10, color: "#22c55e", fontWeight: 900 }}>● OPEN</span>
-          <span style={{ fontSize: 10, color: "#f59e0b", fontWeight: 900 }}>● CAUTION</span>
-          <span style={{ fontSize: 10, color: "#ef4444", fontWeight: 900 }}>● BLOCKED</span>
+        <div className="legend-row">
+          <span className="legend-item is-normal">● OPEN</span>
+          <span className="legend-item is-caution">● CAUTION</span>
+          <span className="legend-item is-blocked">● BLOCKED</span>
         </div>
       </div>
 
@@ -152,12 +147,13 @@ export default function RouteMapLeaflet({
             const effective = getRouteEffectiveHours(route);
             const hasExplicitEff = hasExplicitRouteEffectiveHours(route);
             const isSelected = selectedId === routeId;
+            const routeTheme = getRouteStatusTheme(route.status);
             return (
               <Polyline
                 key={routeId}
                 positions={line.latlngs}
                 pathOptions={{
-                  color: colorForStatus(route.status),
+                  color: routeTheme.lineColor,
                   weight: isSelected ? 7 : 5,
                   opacity: route.status === "BLOCKED" ? 0.65 : 0.95,
                   dashArray: route.status === "CAUTION" ? "10 8" : undefined
@@ -165,16 +161,16 @@ export default function RouteMapLeaflet({
                 eventHandlers={{ click: () => onSelect(routeId) }}
               >
                 <Tooltip sticky direction="top">
-                  <div style={{ fontSize: 12, fontWeight: 900 }}>
-                    Route {routeId} <span style={{ color: colorForStatus(route.status) }}>{route.status}</span>
+                  <div className="tooltip-title">
+                    Route {routeId} <span className={routeTheme.className}>{route.status}</span>
                   </div>
-                  <div style={{ fontSize: 11 }}>
+                  <div className="tooltip-body">
                     effective ~{Number.isFinite(effective) ? effective.toFixed(1) : "—"}h {hasExplicitEff ? "(backend)" : `(buffer x${ROUTE_BUFFER_FACTOR})`}
                   </div>
-                  <div style={{ fontSize: 10, color: "#94a3b8" }}>
+                  <div className="tooltip-meta">
                     source: {line.isFallback ? "fallback" : `${line.provider}/${line.profile}`}
                   </div>
-                  {line.error ? <div style={{ fontSize: 10, color: "#fca5a5", marginTop: 4 }}>{line.error}</div> : null}
+                  {line.error ? <div className="tooltip-error">{line.error}</div> : null}
                 </Tooltip>
               </Polyline>
             );
@@ -188,8 +184,8 @@ export default function RouteMapLeaflet({
               pathOptions={{ color: "#94a3b8", fillColor: "#94a3b8", fillOpacity: 0.9 }}
             >
               <Tooltip direction="top">
-                <div style={{ fontSize: 12, fontWeight: 900 }}>{node.label || nodeId}</div>
-                <div style={{ fontSize: 10, color: "#94a3b8", fontFamily: "monospace" }}>
+                <div className="tooltip-title">{node.label || nodeId}</div>
+                <div className="tooltip-meta tooltip-meta--mono">
                   {Number(node.lat).toFixed(4)}, {Number(node.lng).toFixed(4)}
                 </div>
               </Tooltip>

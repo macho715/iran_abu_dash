@@ -1,6 +1,7 @@
 import React from "react";
 import { ROUTE_BUFFER_FACTOR } from "../../lib/constants.js";
 import { getRouteEffectiveHours, hasExplicitRouteEffectiveHours } from "../../lib/utils.js";
+import { getCongestionTheme, getRouteStatusTheme } from "../../lib/statusTheme.js";
 import RouteMapLeaflet from "../RouteMapLeaflet.jsx";
 
 function normalizeNewsRef(ref, index) {
@@ -41,25 +42,23 @@ export default function RoutesTab({ routes = [], routeGeo, selectedRouteId, onSe
             const eff = getRouteEffectiveHours(route);
             const hasExplicitEff = hasExplicitRouteEffectiveHours(route);
             const isBlocked = route.status === "BLOCKED";
-            const isCaution = route.status === "CAUTION";
-            const borderColor = selectedRouteId === route.id ? "#3b82f6" : (isBlocked ? "#7f1d1d" : isCaution ? "#92400e" : "#1e293b");
-            const badgeBg = isBlocked ? "#7f1d1d" : isCaution ? "#92400e" : "#14532d";
-            const statusColor = isBlocked ? "#f87171" : isCaution ? "#f59e0b" : "#22c55e";
+            const routeTheme = getRouteStatusTheme(route.status);
+            const congestionValue = route.cong ?? route.congestion ?? 0;
+            const congestionTheme = getCongestionTheme(congestionValue);
             const refs = (Array.isArray(route.newsRefs) ? route.newsRefs : []).map(normalizeNewsRef).filter(Boolean);
             return (
               <div
                 key={route.id}
-                className="route-card"
-                style={{ borderColor, opacity: isBlocked ? 0.82 : 1 }}
+                className={`route-card ${routeTheme.className} ${selectedRouteId === route.id ? "is-selected" : ""}`.trim()}
               >
                 <div className="split-header">
                   <div className="route-card__header">
-                    <span className="route-card__badge" style={{ background: badgeBg }}>{route.id}</span>
+                    <span className="route-card__badge">{route.id}</span>
                     <div>
                       <div className="section-title">{route.name}</div>
                       <div className="route-card__status-row">
-                        <span className="priority-label" style={{ color: statusColor }}>{route.status}</span>
-                        {isBlocked && <span className="status-chip" style={{ background: "#7f1d1d", color: "#fca5a5" }}>⛔ 사용금지</span>}
+                        <span className={`priority-label ${routeTheme.className}`}>{route.status}</span>
+                        {isBlocked && <span className="status-chip is-blocked">⛔ 사용금지</span>}
                       </div>
                     </div>
                   </div>
@@ -77,22 +76,13 @@ export default function RoutesTab({ routes = [], routeGeo, selectedRouteId, onSe
                   </div>
                   <div className="metric-card">
                     <div className="metric-card__label">Congestion</div>
-                    <div
-                      className="metric-card__value"
-                      style={{
-                        color: (route.cong ?? route.congestion ?? 0) > 0.5
-                          ? "#f87171"
-                          : (route.cong ?? route.congestion ?? 0) > 0.3
-                            ? "#f59e0b"
-                            : "#22c55e"
-                      }}
-                    >
-                      {(route.cong ?? route.congestion ?? 0).toFixed(2)}
+                    <div className={`metric-card__value ${congestionTheme.className}`}>
+                      {congestionValue.toFixed(2)}
                     </div>
                   </div>
                   <div className="metric-card">
                     <div className="metric-card__label">Status</div>
-                    <div className="metric-card__value" style={{ color: statusColor }}>{route.status}</div>
+                    <div className={`metric-card__value ${routeTheme.className}`}>{route.status}</div>
                   </div>
                 </div>
                 {route.note && <div className="body-copy section-gap-top">{route.note}</div>}

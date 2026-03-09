@@ -2,6 +2,7 @@ import React from "react";
 import { Card, Gauge } from "../ui.jsx";
 import { KEY_ASSUMPTIONS } from "../../data/hyieLegacyContent.js";
 import { formatTimeGST } from "../../lib/utils.js";
+import { getAssumptionTheme, getIntelPriorityTheme, getLikelihoodTheme } from "../../lib/statusTheme.js";
 
 function stat(value, suffix = "") {
   return Number.isFinite(Number(value)) ? `${Number(value)}${suffix}` : "n/a";
@@ -32,14 +33,7 @@ export default function OverviewTab({
           <div className="nested-panel">
             <div className="section-title">Likelihood</div>
             <div
-              className="big-stat"
-              style={{
-                color: derived.likelihoodLabel === "HIGHLY LIKELY"
-                  ? "#ef4444"
-                  : derived.likelihoodLabel === "LIKELY"
-                    ? "#f59e0b"
-                    : "#22c55e"
-              }}
+              className={`big-stat ${getLikelihoodTheme(derived.likelihoodLabel).className}`}
             >
               {derived.likelihoodLabel}
             </div>
@@ -97,11 +91,7 @@ export default function OverviewTab({
           {KEY_ASSUMPTIONS.map((item) => (
             <div
               key={item.id}
-              className="assumption-card"
-              style={{
-                background: item.status === "warn" ? "rgba(245,158,11,0.06)" : "var(--surface-nested)",
-                borderColor: item.status === "warn" ? "#92400e" : "var(--border-default)"
-              }}
+              className={`assumption-card ${getAssumptionTheme(item.status).className}`}
             >
               <div className="assumption-card__header">
                 <span className="assumption-card__id">{item.id}</span>
@@ -126,16 +116,7 @@ export default function OverviewTab({
             <div className="filter-row">
               {dash.aiAnalysis.threat_level && (
                 <span
-                  className="status-chip"
-                  style={{
-                    color: dash.aiAnalysis.threat_level === "CRITICAL"
-                      ? "#ef4444"
-                      : dash.aiAnalysis.threat_level === "HIGH"
-                        ? "#f97316"
-                        : dash.aiAnalysis.threat_level === "MEDIUM"
-                          ? "#eab308"
-                          : "#22c55e"
-                  }}
+                  className={`status-chip ${getIntelPriorityTheme(dash.aiAnalysis.threat_level).className}`}
                 >
                   {dash.aiAnalysis.threat_level}
                 </span>
