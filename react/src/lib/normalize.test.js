@@ -36,4 +36,26 @@ describe("normalizeIncomingPayload", () => {
     expect(normalized.routes[0].effective_h).toBe(7.4);
     expect(normalized.routes[0].effectiveH).toBe(7.4);
   });
+
+  it("normalizes degraded values from boolean, string, and number inputs", () => {
+    const cases = [
+      { degraded: true, expected: true },
+      { degraded: false, expected: false },
+      { degraded: "true", expected: true },
+      { degraded: "false", expected: false },
+      { degraded: 1, expected: true },
+      { degraded: 0, expected: false }
+    ];
+
+    cases.forEach(({ degraded, expected }) => {
+      const normalized = normalizeIncomingPayload({
+        dashboard: createDashboard({
+          metadata: { degraded }
+        })
+      });
+
+      expect(normalized).not.toBeNull();
+      expect(normalized.metadata.degraded).toBe(expected);
+    });
+  });
 });

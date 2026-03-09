@@ -138,10 +138,26 @@ function normalizeChecklistItem(raw = {}, idx = 0) {
   return { id, text, done };
 }
 
+function toBooleanLoose(value) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+    if (normalized === "1") return true;
+    if (normalized === "0") return false;
+    return false;
+  }
+
+  return false;
+}
+
 export function normalizeMetadata(raw = {}) {
   const stateTs = normalizeWhitespace(raw?.stateTs ?? raw?.state_ts ?? raw?.state_ts_gst ?? "");
   const status = normalizeWhitespace(raw?.status ?? "").toLowerCase();
-  const degraded = Boolean(raw?.degraded);
+  const degraded = toBooleanLoose(raw?.degraded);
   const egressLossETA = clampEgress(raw?.egressLossETA ?? raw?.egress_loss_eta ?? raw?.egressLossEta ?? raw?.egress_loss_eta_hours);
   const evidenceConf = clamp01(raw?.evidenceConf ?? raw?.evidence_conf);
   const effectiveThreshold = clamp01(raw?.effectiveThreshold ?? raw?.effective_threshold ?? 0.8);
