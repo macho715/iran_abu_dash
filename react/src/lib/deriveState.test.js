@@ -99,4 +99,17 @@ describe("deriveState", () => {
     expect(derived.schemaMismatchReason).toBe("SCHEMA_VERSION_UNSUPPORTED");
   });
 
+  it("renders conflictDayLabel as n/a when conflict_day is null", () => {
+    const derived = deriveState(
+      createDashboard({
+        metadata: {
+          conflictStats: {
+            conflict_day: null,
+          },
+        },
+      })
+    );
+
+    expect(derived.conflictDayLabel).toBe("n/a");
+  });
 });

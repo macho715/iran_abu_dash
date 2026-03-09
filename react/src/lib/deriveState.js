@@ -83,7 +83,11 @@ export function deriveState(dash, egressLossETAOverride) {
   const confBand = ec >= 0.8 ? "HIGH" : ec >= 0.6 ? "MEDIUM-HIGH" : ec >= 0.4 ? "MEDIUM" : "LOW";
 
   const conflictStats = normalizeConflictStats(dash?.metadata?.conflictStats ?? dash?.metadata?.conflict_stats ?? {});
-  const conflictDayLabel = Number.isFinite(Number(conflictStats.conflict_day)) ? `Day ${conflictStats.conflict_day}` : "n/a";
+  const rawConflictDay = dash?.metadata?.conflictStats?.conflict_day ?? dash?.metadata?.conflict_stats?.conflict_day;
+  const conflictDayLabel =
+    Number.isInteger(rawConflictDay) && rawConflictDay >= 0
+      ? `Day ${rawConflictDay}`
+      : "n/a";
   const conflictSourceLabel = String(conflictStats?.source || "n/a");
 
   const stateTsMs = Date.parse(String(dash?.metadata?.stateTs || ""));
