@@ -24,7 +24,7 @@ export default function AnalysisTab({
   const decisionLogs = (timeline || []).filter((event) => event.category === "DECISION_TRACE");
 
   return (
-    <div>
+    <div className="analysis-layout">
       <Card>
         <div className="split-header">
           <div>
@@ -79,7 +79,6 @@ export default function AnalysisTab({
             ))}
           </div>
         ) : null}
-
         <TimelinePanel timeline={timeline} onClear={onClearTimeline} onExport={onExportTimeline} />
       </Card>
     </div>
