@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockState = vi.hoisted(() => ({
@@ -112,6 +112,30 @@ describe("useDashboardData", () => {
       label: "긴급 판단",
       icon: "🚨",
     });
+
+    unmount();
+  });
+
+  it("keeps route selection compatible with updater callbacks", async () => {
+    const { result, unmount } = renderHook(() => useDashboardData());
+
+    await waitFor(() => expect(result.current.usingCachedData).toBe(true));
+
+    act(() => {
+      result.current.setTab("routes");
+    });
+
+    act(() => {
+      result.current.setSelectedRouteId((prev) => (prev === "R1" ? null : "R1"));
+    });
+
+    expect(result.current.selectedRouteId).toBe("R1");
+
+    act(() => {
+      result.current.setSelectedRouteId((prev) => (prev === "R1" ? null : "R1"));
+    });
+
+    expect(result.current.selectedRouteId).toBe(null);
 
     unmount();
   });

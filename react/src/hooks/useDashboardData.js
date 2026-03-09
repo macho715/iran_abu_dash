@@ -6,7 +6,12 @@ import { normalizeIncomingPayload } from "../lib/normalize.js";
 import { mergeTimelineWithNoiseGate } from "../lib/noiseGate.js";
 import { loadCachedDash, cacheLastDash } from "../lib/offlineCache.js";
 import { requestNotifPermission, sendCrisisNotif } from "../lib/notifications.js";
-import { buildFullReport, buildOfflineSummary } from "../lib/summary.js";
+import {
+  buildFullReport,
+  buildKpiSnapshot,
+  buildOfflineSummary,
+  resolveExperimentVariants
+} from "../lib/summary.js";
 import { alertSound, warnSound } from "../lib/sounds.js";
 import { appendHistory, buildDiffEvents, computeDashboardKey, mkEvent } from "../lib/timelineRules.js";
 import { connectLivePointerStream, fetchLatestPointer, fetchPointerArtifact } from "../lib/livePointer.js";
@@ -37,6 +42,32 @@ import {
 const FAST_FAIL_THRESHOLD = 5;
 const SSE_FALLBACK_RETRY_MS = 15000;
 const SAFETY_POLL_MS = 7 * 60 * 1000;
+
+const TELEMETRY_STORAGE_KEY = "urgentdash_anon_telemetry";
+const TELEMETRY_SESSION_KEY = "urgentdash_anon_session";
+const TELEMETRY_MAX_ITEMS = 500;
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function readTelemetryQueue() {
+  const parsed = safeJsonParse(safeGetLS(TELEMETRY_STORAGE_KEY, "[]"), []);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+function appendTelemetryEvent(event) {
+  const queue = [...readTelemetryQueue(), event].slice(-TELEMETRY_MAX_ITEMS);
+  safeSetLS(TELEMETRY_STORAGE_KEY, JSON.stringify(queue));
+}
+
+function getOrCreateAnonSessionId() {
+  const existing = safeGetLS(TELEMETRY_SESSION_KEY, "");
+  if (existing) return existing;
+  const id = `anon-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
+  safeSetLS(TELEMETRY_SESSION_KEY, id);
+  return id;
+}
 
 const TABS = [
   { id: "overview", label: "Overview", icon: "📊" },
@@ -78,8 +109,11 @@ export function useDashboardData() {
   const [isOffline, setIsOffline] = useState(typeof navigator !== "undefined" ? !navigator.onLine : false);
   const [selectedHistoryIndex, setSelectedHistoryIndex] = useState(0);
   const [liveConnectionStatus, setLiveConnectionStatus] = useState("fallback");
+  const [telemetryEvents, setTelemetryEvents] = useState([]);
 
   const mounted = useRef(true);
+  const tabEnteredAtRef = useRef(Date.now());
+  const routeViewStartedAtRef = useRef(null);
   const synced = useRef(false);
   const dashRef = useRef(INITIAL_DASHBOARD);
   const prevDashRef = useRef(null);
@@ -105,6 +139,11 @@ export function useDashboardData() {
     []
   );
   const derived = useMemo(() => deriveState(dash, egressLossETA), [dash, egressLossETA]);
+  const experiments = useMemo(() => resolveExperimentVariants(), []);
+  const kpiSnapshot = useMemo(
+    () => buildKpiSnapshot({ dashboard: dash, telemetry: telemetryEvents }),
+    [dash, telemetryEvents]
+  );
 
   useEffect(() => {
     dashRef.current = dash;
@@ -130,6 +169,17 @@ export function useDashboardData() {
     setAutoSummary(safeGetLS(STORAGE_KEYS.autoSummary, "0") === "1");
     setNotifEnabled(safeGetLS(STORAGE_KEYS.notifications, "0") === "1");
     setSoundEnabled(safeGetLS(STORAGE_KEYS.sound, "0") === "1");
+    const existingTelemetry = readTelemetryQueue();
+    setTelemetryEvents(existingTelemetry);
+
+    const sessionId = getOrCreateAnonSessionId();
+    const hasPreviousSession = existingTelemetry.some((event) => event.type === "session_start");
+    const bootEvents = [{ type: "session_start", sessionId, ts: nowIso() }];
+    if (hasPreviousSession) {
+      bootEvents.push({ type: "session_revisit", sessionId, ts: nowIso() });
+    }
+    bootEvents.forEach((event) => appendTelemetryEvent(event));
+    setTelemetryEvents((prev) => [...prev, ...bootEvents].slice(-TELEMETRY_MAX_ITEMS));
   }, []);
 
   useEffect(() => {
@@ -183,6 +233,17 @@ export function useDashboardData() {
     setTimeline((prev) => mergeTimelineWithNoiseGate(prev, [mkEvent(event)], { maxItems: TIMELINE_MAX }));
   }, []);
 
+  const trackTelemetry = useCallback((event) => {
+    const sessionId = getOrCreateAnonSessionId();
+    const payload = {
+      ts: nowIso(),
+      sessionId,
+      ...event
+    };
+    appendTelemetryEvent(payload);
+    setTelemetryEvents((prev) => [...prev, payload].slice(-TELEMETRY_MAX_ITEMS));
+  }, []);
+
   const fetchCandidates = useCallback(async (candidates = []) => {
     for (const candidate of candidates) {
       try {
@@ -210,7 +271,14 @@ export function useDashboardData() {
 
     if (notifEnabled) {
       important.forEach((event) => {
-        sendCrisisNotif(event);
+        const sent = sendCrisisNotif(event);
+        trackTelemetry({
+          type: "alert_response",
+          level: event.level,
+          acknowledged: Boolean(sent),
+          resolved: true,
+          falseAlarm: false
+        });
       });
     }
     if (soundEnabled) {
@@ -220,7 +288,7 @@ export function useDashboardData() {
         warnSound();
       }
     }
-  }, [notifEnabled, soundEnabled]);
+  }, [notifEnabled, soundEnabled, trackTelemetry]);
 
   const applyDashboard = useCallback((nextDash, { announce = true } = {}) => {
     const mergedDash = {
@@ -467,8 +535,28 @@ export function useDashboardData() {
     const key = computeDashboardKey(dash);
     if (!key || key === lastSummaryKeyRef.current) return;
     lastSummaryKeyRef.current = key;
-    setSummary({ text: buildOfflineSummary(dash, derived), ts: new Date().toISOString(), mode: "OFFLINE" });
-  }, [autoSummary, dash, derived]);
+    setSummary({
+      text: buildOfflineSummary(dash, derived, { experiments, kpis: kpiSnapshot, telemetry: telemetryEvents }),
+      ts: new Date().toISOString(),
+      mode: "OFFLINE"
+    });
+  }, [autoSummary, dash, derived, experiments, kpiSnapshot, telemetryEvents]);
+
+  useEffect(() => {
+    const currentTs = Date.now();
+    const prevEnteredAt = tabEnteredAtRef.current;
+    if (prevEnteredAt) {
+      trackTelemetry({
+        type: "tab_usage",
+        tab,
+        dwellSeconds: Math.max(0, (currentTs - prevEnteredAt) / 1000)
+      });
+    }
+    tabEnteredAtRef.current = currentTs;
+    if (tab === "routes") {
+      routeViewStartedAtRef.current = currentTs;
+    }
+  }, [tab, trackTelemetry]);
 
   useEffect(() => {
     const tabMap = {
@@ -535,6 +623,24 @@ export function useDashboardData() {
       .sort((a, b) => a.eff - b.eff);
   }, [dash.routes]);
 
+  const selectRoute = useCallback((nextRouteIdOrUpdater) => {
+    setSelectedRouteId((prevRouteId) => {
+      const nextRouteId = typeof nextRouteIdOrUpdater === "function"
+        ? nextRouteIdOrUpdater(prevRouteId)
+        : nextRouteIdOrUpdater;
+
+      const nowMs = Date.now();
+      const viewedAt = routeViewStartedAtRef.current ?? nowMs;
+      trackTelemetry({
+        type: "route_selected",
+        routeId: nextRouteId || "none",
+        decisionSeconds: Math.max(0, (nowMs - viewedAt) / 1000)
+      });
+      routeViewStartedAtRef.current = nowMs;
+      return nextRouteId;
+    });
+  }, [trackTelemetry]);
+
   const filteredIntelFeed = useMemo(() => {
     if (intelFilter === "ALL") return dash.intelFeed || [];
     return (dash.intelFeed || []).filter((item) => item.priority === intelFilter);
@@ -583,10 +689,14 @@ export function useDashboardData() {
   }, [logEvent]);
 
   const generateSummary = useCallback(() => {
-    const text = buildOfflineSummary(dashRef.current, deriveState(dashRef.current, egressLossETA));
+    const text = buildOfflineSummary(dashRef.current, deriveState(dashRef.current, egressLossETA), {
+      experiments,
+      kpis: kpiSnapshot,
+      telemetry: telemetryEvents
+    });
     setSummary({ text, ts: new Date().toISOString(), mode: "OFFLINE" });
     logEvent({ level: "INFO", category: "SUMMARY", title: "Summary generated" });
-  }, [egressLossETA, logEvent]);
+  }, [egressLossETA, experiments, kpiSnapshot, logEvent, telemetryEvents]);
 
   const copySummary = useCallback(async () => {
     const ok = await tryCopyText(summary.text);
@@ -595,30 +705,38 @@ export function useDashboardData() {
   }, [logEvent, summary.text]);
 
   const exportReport = useCallback(() => {
-    const text = buildFullReport(dashRef.current, deriveState(dashRef.current, egressLossETA));
+    const text = buildFullReport(dashRef.current, deriveState(dashRef.current, egressLossETA), {
+      experiments,
+      kpis: kpiSnapshot,
+      telemetry: telemetryEvents
+    });
     const name = `urgentdash_report_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.txt`;
     downloadText(name, text);
     logEvent({ level: "INFO", category: "SUMMARY", title: "Report exported", detail: name });
-  }, [egressLossETA, logEvent]);
+  }, [egressLossETA, experiments, kpiSnapshot, logEvent, telemetryEvents]);
 
   const toggleNotifications = useCallback(async () => {
     if (notifEnabled) {
       setNotifEnabled(false);
+      trackTelemetry({ type: "notification_preference", enabled: false, action: "disabled" });
       return false;
     }
     const status = await requestNotifPermission();
     if (status === "granted") {
       setNotifEnabled(true);
       setError(null);
+      trackTelemetry({ type: "notification_preference", enabled: true, action: "permission_granted" });
       return true;
     }
     if (status === "unsupported") {
+      trackTelemetry({ type: "notification_preference", enabled: false, action: "unsupported" });
       setError("브라우저가 알림을 지원하지 않습니다.");
     } else {
       setError("브라우저 알림 권한이 거부되었습니다.");
+      trackTelemetry({ type: "notification_preference", enabled: false, action: "permission_denied" });
     }
     return false;
-  }, [notifEnabled]);
+  }, [notifEnabled, trackTelemetry]);
 
   const toggleSound = useCallback(() => {
     setSoundEnabled((prev) => !prev);
@@ -645,7 +763,7 @@ export function useDashboardData() {
     history,
     timeline,
     selectedRouteId,
-    setSelectedRouteId,
+    setSelectedRouteId: selectRoute,
     summary,
     autoSummary,
     setAutoSummary,
@@ -667,6 +785,9 @@ export function useDashboardData() {
     histEc,
     usableRoutes,
     filteredIntelFeed,
+    experiments,
+    kpiSnapshot,
+    telemetryEvents,
     fetchLatestState,
     logEvent,
     exportTimeline,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 import sys
 from datetime import datetime
@@ -184,6 +185,99 @@ def build_report_text(
 ) -> str:
     """Public API: reusable report payload builder."""
     return _build_report(articles, analysis=analysis, notebook_url=notebook_url)
+
+
+
+def _safe_rate(numerator: float, denominator: float) -> float:
+    if denominator <= 0:
+        return 0.0
+    return (numerator / denominator) * 100.0
+
+
+def _two_prop_p_value(success_a: float, total_a: float, success_b: float, total_b: float) -> float:
+    if total_a <= 0 or total_b <= 0:
+        return 1.0
+
+    p_a = success_a / total_a
+    p_b = success_b / total_b
+    pooled = (success_a + success_b) / (total_a + total_b)
+    variance = pooled * (1.0 - pooled) * ((1.0 / total_a) + (1.0 / total_b))
+    if variance <= 0:
+        return 1.0
+
+    z_score = (p_a - p_b) / math.sqrt(variance)
+    cdf = 0.5 * (1.0 + math.erf(abs(z_score) / math.sqrt(2.0)))
+    return max(0.0, min(1.0, 2.0 * (1.0 - cdf)))
+
+
+def _mark_deprecate_candidate(change: float, favorable_up: bool) -> bool:
+    if favorable_up:
+        return change <= -5.0
+    return change >= 5.0
+
+
+def build_weekly_report_text(metrics: dict) -> str:
+    """주간 KPI 변화 리포트를 생성한다 / Build weekly KPI delta report."""
+    now = datetime.now().strftime("%Y-%m-%d")
+    current = metrics.get("current", {})
+    previous = metrics.get("previous", {})
+    experiment = metrics.get("experiment", {})
+
+    kpi_specs = [
+        ("decision_time_reduction", "결정 시간 단축", True),
+        ("warning_accuracy", "경고 정확도", True),
+        ("false_alarm_rate", "False alarm rate", False),
+        ("user_revisit", "사용자 재방문", True),
+    ]
+
+    lines = [
+        f"📆 *주간 KPI 리포트* ({now})",
+        "",
+        "핵심 KPI: 결정 시간 단축, 경고 정확도, false alarm rate, 사용자 재방문",
+        "",
+        "📊 *KPI 변화*",
+    ]
+
+    deprecate: list[str] = []
+
+    for key, label, favorable_up in kpi_specs:
+        curr = float(current.get(key, 0.0))
+        prev = float(previous.get(key, 0.0))
+        delta = curr - prev
+        direction = "▲" if delta >= 0 else "▼"
+        lines.append(f"• {label}: {curr:.2f}% ({direction} {abs(delta):.2f}%p)")
+        if _mark_deprecate_candidate(delta, favorable_up):
+            deprecate.append(label)
+
+    base_success = float(experiment.get("control_success", 0.0))
+    base_total = float(experiment.get("control_total", 0.0))
+    var_success = float(experiment.get("variant_success", 0.0))
+    var_total = float(experiment.get("variant_total", 0.0))
+    p_value = _two_prop_p_value(var_success, var_total, base_success, base_total)
+
+    control_rate = _safe_rate(base_success, base_total)
+    variant_rate = _safe_rate(var_success, var_total)
+    significant = "유의" if p_value < 0.05 else "유의하지 않음"
+
+    lines.extend(
+        [
+            "",
+            "🧪 *A/B 실험 요약*",
+            f"• Control 성공률: {control_rate:.2f}% ({int(base_success)}/{int(base_total)})",
+            f"• Variant 성공률: {variant_rate:.2f}% ({int(var_success)}/{int(var_total)})",
+            f"• 통계 검정 p-value: {p_value:.4f} ({significant})",
+        ]
+    )
+
+    lines.append("")
+    if deprecate:
+        lines.append("🗂️ *Deprecate 후보 기능*")
+        for feature in deprecate:
+            lines.append(f"• {feature}")
+    else:
+        lines.append("🗂️ *Deprecate 후보 기능*: 없음")
+
+    return "\n".join(lines)
 
 
 def _split_telegram_chunks(text: str, max_len: int = TELEGRAM_MAX_MESSAGE_LEN) -> list[str]:
