@@ -1,6 +1,50 @@
 import { SNAPSHOT_REQUIRED_KEYS } from "./constants.js";
 import { clamp01, clampEgress, inferEvidenceFromSource, summarizeSourceHealth, toTsIso, normalizeWhitespace, safeNumber } from "./utils.js";
 
+const SCHEMA_COMPAT_MATRIX = Object.freeze({
+  "2025.10": { minClient: "2025.10", maxClient: "2025.99" }
+});
+const CLIENT_SCHEMA_VERSION = "2025.10";
+
+function compareSchemaVersions(a, b) {
+  const [aYear = "0", aMinor = "0"] = String(a || "").split(".");
+  const [bYear = "0", bMinor = "0"] = String(b || "").split(".");
+  const ay = Number(aYear);
+  const by = Number(bYear);
+  const am = Number(aMinor);
+  const bm = Number(bMinor);
+  if (!Number.isFinite(ay) || !Number.isFinite(by) || !Number.isFinite(am) || !Number.isFinite(bm)) return 0;
+  if (ay !== by) return ay > by ? 1 : -1;
+  if (am !== bm) return am > bm ? 1 : -1;
+  return 0;
+}
+
+function evaluateSchemaCompatibility(schemaVersion) {
+  const normalized = normalizeWhitespace(schemaVersion || "");
+  if (!normalized) {
+    return {
+      schemaVersion: "",
+      schemaCompatible: false,
+      schemaMismatchReason: "SCHEMA_VERSION_MISSING"
+    };
+  }
+  const range = SCHEMA_COMPAT_MATRIX[normalized];
+  if (!range) {
+    return {
+      schemaVersion: normalized,
+      schemaCompatible: false,
+      schemaMismatchReason: "SCHEMA_VERSION_UNSUPPORTED"
+    };
+  }
+  const lower = compareSchemaVersions(CLIENT_SCHEMA_VERSION, range.minClient) >= 0;
+  const upper = compareSchemaVersions(CLIENT_SCHEMA_VERSION, range.maxClient) <= 0;
+  return {
+    schemaVersion: normalized,
+    schemaCompatible: lower && upper,
+    schemaMismatchReason: lower && upper ? null : "SCHEMA_VERSION_CLIENT_OUT_OF_RANGE"
+  };
+}
+
 export function normalizeConflictStats(raw = {}) {
   const toInt = (v) => {
     const n = Number(v);
@@ -166,10 +210,30 @@ export function normalizeMetadata(raw = {}) {
       integrityRaw?.failCount ?? raw?.integrity_fail_count ?? raw?.integrityFailCount
     )))
     : 0;
+  const schemaCheck = evaluateSchemaCompatibility(raw?.schemaVersion ?? raw?.schema_version);
   return {
-    stateTs, status, degraded, egressLossETA, evidenceConf, effectiveThreshold,
-    deltaScore, urgency, triggers, conflictStats, sourceHealth, sourceOk: ok, sourceTotal: total, source,
-    integrityStatus, integrityVerifiedAt, integrityFailCount
+    stateTs,
+    status,
+    degraded: degraded || !schemaCheck.schemaCompatible,
+    egressLossETA,
+    evidenceConf,
+    effectiveThreshold,
+    deltaScore,
+    urgency,
+    triggers,
+    conflictStats,
+    sourceHealth,
+    sourceOk: ok,
+    sourceTotal: total,
+    source,
+    integrityStatus,
+    integrityVerifiedAt,
+    integrityFailCount,
+    version: normalizeWhitespace(raw?.version || ""),
+    generatedAt: normalizeWhitespace(raw?.generatedAt ?? raw?.generated_at ?? ""),
+    schemaVersion: schemaCheck.schemaVersion,
+    schemaCompatible: schemaCheck.schemaCompatible,
+    schemaMismatchReason: schemaCheck.schemaMismatchReason
   };
 }
 

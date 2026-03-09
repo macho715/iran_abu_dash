@@ -90,4 +90,13 @@ describe("deriveState", () => {
     expect(derived.decisionTrace.thresholdBreakdown.deltaScore.passed).toBe(true);
     expect(derived.decisionTrace.scoreBreakdown.leadHypothesisId).toBe("H2");
   });
+
+  it("forces degraded mode when schema compatibility fails", () => {
+    const derived = deriveState(createDashboard({ metadata: { schemaCompatible: false, schemaMismatchReason: "SCHEMA_VERSION_UNSUPPORTED" } }));
+
+    expect(derived.schemaMismatch).toBe(true);
+    expect(derived.modeState).toBe("DEGRADED");
+    expect(derived.schemaMismatchReason).toBe("SCHEMA_VERSION_UNSUPPORTED");
+  });
+
 });

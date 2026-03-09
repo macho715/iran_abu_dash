@@ -15,6 +15,7 @@ LAST_UPDATED_FILENAME = "last_updated.json"
 VERSION_DIRNAME = "v"
 LITE_FILENAME = "state-lite.json"
 AI_FILENAME = "state-ai.json"
+SCHEMA_VERSION = "2025.10"
 
 
 def _json_text(payload: dict[str, Any]) -> str:
@@ -108,6 +109,14 @@ def merge_ai_into_snapshot(snapshot: dict[str, Any], ai_analysis: dict[str, Any]
     return payload
 
 
+def with_contract_fields(payload: dict[str, Any], *, version: str, generated_at: str) -> dict[str, Any]:
+    merged = deepcopy(payload)
+    merged["version"] = version
+    merged["schemaVersion"] = SCHEMA_VERSION
+    merged["generatedAt"] = generated_at
+    return merged
+
+
 def load_live_latest(live_root: Path) -> dict[str, Any] | None:
     return load_json(live_root / LATEST_FILENAME)
 
@@ -175,10 +184,11 @@ def publish_lite_bundle(
     health: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     collected_at = collected_at or utc_now_iso()
-    lite = lite_snapshot(snapshot)
+    lite = with_contract_fields(lite_snapshot(snapshot), version=version, generated_at=collected_at)
     provenance = _provenance_payload(collected_at)
     latest = {
         "version": version,
+        "schemaVersion": SCHEMA_VERSION,
         "collectedAt": collected_at,
         "stateTs": lite.get("state_ts"),
         "liteUrl": _rel_version_file(version, LITE_FILENAME),
@@ -220,6 +230,7 @@ def publish_ai_bundle(
     provenance = _provenance_payload(ai_updated_at)
     latest = load_live_latest(live_root) or {
         "version": version,
+        "schemaVersion": SCHEMA_VERSION,
         "collectedAt": utc_now_iso(),
         "stateTs": snapshot.get("state_ts"),
         "liteUrl": _rel_version_file(version, LITE_FILENAME),
@@ -231,6 +242,7 @@ def publish_ai_bundle(
         "sourceHealth": snapshot.get("source_health", {}),
     }
     latest["version"] = version
+    latest["schemaVersion"] = SCHEMA_VERSION
     latest["stateTs"] = snapshot.get("state_ts")
     latest["liteUrl"] = _rel_version_file(version, LITE_FILENAME)
     latest["aiVersion"] = ai_updated_at
@@ -246,6 +258,8 @@ def publish_ai_bundle(
 
     ai_payload = {
         "version": version,
+        "schemaVersion": SCHEMA_VERSION,
+        "generatedAt": ai_updated_at,
         "aiVersion": ai_updated_at,
         "aiUpdatedAt": ai_updated_at,
         "aiStatus": "ok",
@@ -263,7 +277,11 @@ def publish_ai_bundle(
     latest["integrity"]["ai"]["sigUrl"] = _integrity_rel_file(version, AI_FILENAME, ".sig")
     latest = _with_health_fields(latest, health)
 
-    compat_payload = merge_ai_into_snapshot(snapshot, ai_analysis)
+    compat_payload = with_contract_fields(
+        merge_ai_into_snapshot(snapshot, ai_analysis),
+        version=version,
+        generated_at=ai_updated_at,
+    )
     save_json(live_root / LATEST_FILENAME, latest)
     save_json(live_root / LEGACY_FILENAME, compat_payload)
     save_json(live_root / LAST_UPDATED_FILENAME, _last_updated_payload(compat_payload, latest))

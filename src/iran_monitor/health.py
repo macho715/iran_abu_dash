@@ -39,6 +39,39 @@ _LIVE_REFRESH_LOCK: asyncio.Lock | None = None
 _LIVE_REFRESH_LOCK_LOOP: asyncio.AbstractEventLoop | None = None
 _LIVE_REFRESH_LAST_ATTEMPT_AT: datetime | None = None
 
+LATEST_REQUIRED_KEYS = {"version", "schemaVersion", "collectedAt", "liteUrl", "status"}
+STATE_REQUIRED_KEYS = {
+    "version",
+    "schemaVersion",
+    "generatedAt",
+    "state_ts",
+    "status",
+    "source_health",
+    "degraded",
+    "flags",
+    "intel_feed",
+    "indicators",
+    "hypotheses",
+    "routes",
+    "checklist",
+}
+
+
+def _contract_error_payload(*, error_code: str, reason_code: str, missing_keys: list[str], endpoint: str) -> dict[str, Any]:
+    return {
+        "error": error_code,
+        "errorCode": error_code,
+        "reasonCode": reason_code,
+        "endpoint": endpoint,
+        "missingKeys": missing_keys,
+    }
+
+
+def _missing_required_keys(payload: dict[str, Any] | None, required_keys: set[str]) -> list[str]:
+    if not isinstance(payload, dict):
+        return sorted(required_keys)
+    return sorted(required_keys - set(payload.keys()))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -211,24 +244,17 @@ async def api_state() -> dict[str, Any]:
     if data is None:
         return warming_up_payload()
 
-    required_keys = {
-        "state_ts",
-        "status",
-        "source_health",
-        "degraded",
-        "flags",
-        "intel_feed",
-        "indicators",
-        "hypotheses",
-        "routes",
-        "checklist",
-    }
-    missing = sorted(required_keys - set(data.keys()))
+    missing = _missing_required_keys(data, STATE_REQUIRED_KEYS)
     if missing:
-        payload = warming_up_payload()
-        payload["flags"] = payload.get("flags", []) + [f"STATE_SCHEMA_MISSING:{','.join(missing)}"]
-        payload["status"] = "warming_up"
-        return payload
+        return JSONResponse(
+            status_code=502,
+            content=_contract_error_payload(
+                error_code="STATE_CONTRACT_ERROR",
+                reason_code="STATE_REQUIRED_KEYS_MISSING",
+                missing_keys=missing,
+                endpoint="/api/state",
+            ),
+        )
 
     return data
 
@@ -238,6 +264,17 @@ async def api_live_latest() -> JSONResponse:
     payload = await _ensure_live_bundle("api_live_latest")
     if payload is None:
         return JSONResponse(status_code=404, content={"error": "latest.json not found"})
+    missing = _missing_required_keys(payload, LATEST_REQUIRED_KEYS)
+    if missing:
+        return JSONResponse(
+            status_code=502,
+            content=_contract_error_payload(
+                error_code="LATEST_CONTRACT_ERROR",
+                reason_code="LATEST_REQUIRED_KEYS_MISSING",
+                missing_keys=missing,
+                endpoint="/api/live/latest",
+            ),
+        )
     return JSONResponse(content=payload)
 
 

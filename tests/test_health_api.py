@@ -119,6 +119,7 @@ class HealthApiTests(unittest.TestCase):
         latest = self.client.get("/api/live/latest")
         self.assertEqual(latest.status_code, 200)
         self.assertEqual(latest.json()["version"], "2026-03-06T05-27-22Z")
+        self.assertEqual(latest.json()["schemaVersion"], "2025.10")
 
         lite = self.client.get("/api/live/v/2026-03-06T05-27-22Z/state-lite.json")
         self.assertEqual(lite.status_code, 200)
@@ -157,6 +158,32 @@ class HealthApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["version"], "2026-03-06T10-00-00Z")
         self.assertEqual(refresh_mock.call_count, 1)
+
+    def test_api_live_latest_returns_contract_error_when_schema_version_missing(self) -> None:
+        latest_path = self.live_root / "latest.json"
+        latest_payload = json.loads(latest_path.read_text(encoding="utf-8"))
+        latest_payload.pop("schemaVersion", None)
+        latest_path.write_text(json.dumps(latest_payload), encoding="utf-8")
+
+        response = self.client.get("/api/live/latest")
+        self.assertEqual(response.status_code, 502)
+        body = response.json()
+        self.assertEqual(body["errorCode"], "LATEST_CONTRACT_ERROR")
+        self.assertEqual(body["reasonCode"], "LATEST_REQUIRED_KEYS_MISSING")
+        self.assertIn("schemaVersion", body["missingKeys"])
+
+    def test_api_state_returns_contract_error_when_required_keys_missing(self) -> None:
+        state_path = self.live_root / "hyie_state.json"
+        state_payload = json.loads(state_path.read_text(encoding="utf-8"))
+        state_payload.pop("schemaVersion", None)
+        state_path.write_text(json.dumps(state_payload), encoding="utf-8")
+
+        response = self.client.get("/api/state")
+        self.assertEqual(response.status_code, 502)
+        body = response.json()
+        self.assertEqual(body["errorCode"], "STATE_CONTRACT_ERROR")
+        self.assertEqual(body["reasonCode"], "STATE_REQUIRED_KEYS_MISSING")
+        self.assertIn("schemaVersion", body["missingKeys"])
 
 
 if __name__ == "__main__":

@@ -36,4 +36,23 @@ describe("normalizeIncomingPayload", () => {
     expect(normalized.routes[0].effective_h).toBe(7.4);
     expect(normalized.routes[0].effectiveH).toBe(7.4);
   });
+
+  it("marks payload degraded when schemaVersion is missing", () => {
+    const normalized = normalizeIncomingPayload(createSnapshot({ metadata: { schemaVersion: undefined } }));
+
+    expect(normalized).not.toBeNull();
+    expect(normalized.metadata.schemaCompatible).toBe(false);
+    expect(normalized.metadata.schemaMismatchReason).toBe("SCHEMA_VERSION_MISSING");
+    expect(normalized.metadata.degraded).toBe(true);
+  });
+
+  it("marks payload degraded when schemaVersion is unsupported", () => {
+    const normalized = normalizeIncomingPayload(createSnapshot({ metadata: { schemaVersion: "2026.01" } }));
+
+    expect(normalized).not.toBeNull();
+    expect(normalized.metadata.schemaCompatible).toBe(false);
+    expect(normalized.metadata.schemaMismatchReason).toBe("SCHEMA_VERSION_UNSUPPORTED");
+    expect(normalized.metadata.degraded).toBe(true);
+  });
+
 });

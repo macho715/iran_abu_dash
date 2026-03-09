@@ -2,6 +2,9 @@ export function createDashboard(overrides = {}) {
   const base = {
     metadata: {
       stateTs: "2026-03-06T10:00:00Z",
+      version: "2026-03-06T10-00-00Z",
+      schemaVersion: "2025.10",
+      generatedAt: "2026-03-06T10:00:00Z",
       status: "live",
       degraded: false,
       egressLossETA: 8,
