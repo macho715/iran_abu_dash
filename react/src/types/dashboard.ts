@@ -120,6 +120,10 @@ export interface DerivedState {
   staleWarningVisible: boolean;
   sourceHealthLabel: string;
   liveSource: string;
+  integrityLabel: string;
+  integrityColor: string;
+  integrityVerifiedAt: string;
+  integrityFailCount: number;
   leadingHypothesis: Hypothesis;
   leadingColor: string;
   conflictStats: Record<string, unknown>;

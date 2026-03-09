@@ -1,8 +1,10 @@
+import crypto from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   FIXED_PUBLISH_SOURCE_LABEL,
   buildLiveArtifactUrl,
+  computeExpectedSig,
   resetPublishSourceWarningForTest
 } from "./_liveProxy.js";
 import handler from "./state.js";
@@ -34,6 +36,18 @@ function jsonResponse(payload, status = 200) {
   };
 }
 
+function textResponse(payload, status = 200) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    text: async () => String(payload)
+  };
+}
+
+function sha256Hex(raw) {
+  return crypto.createHash("sha256").update(String(raw || ""), "utf8").digest("hex");
+}
+
 describe("/api/state", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
@@ -42,13 +56,24 @@ describe("/api/state", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     resetPublishSourceWarningForTest();
+    delete process.env.URGENTDASH_INTEGRITY_FAILURE_POLICY;
   });
 
-  it("merges lite and ai payloads from the fixed upstream source", async () => {
+  it("merges lite and ai payloads with integrity verification", async () => {
     const version = "2026-03-08T16-59-33Z";
     const latestUrl = buildLiveArtifactUrl("latest.json");
     const liteUrl = buildLiveArtifactUrl("v", version, "state-lite.json");
     const aiUrl = buildLiveArtifactUrl("v", version, "state-ai.json");
+
+    const liteBody = JSON.stringify({ status: "ok", routes: [], indicators: [] });
+    const aiBody = JSON.stringify({
+      ai_analysis: { summary: "live ai" },
+      aiVersion: "2026-03-08T21:00:02+04:00",
+      aiUpdatedAt: "2026-03-08T21:00:02+04:00",
+      aiStatus: "ok"
+    });
+    const liteHash = sha256Hex(liteBody);
+    const aiHash = sha256Hex(aiBody);
 
     fetch.mockImplementation(async (url) => {
       const requestUrl = String(url).replace(/\?ts=\d+$/, "");
@@ -56,24 +81,29 @@ describe("/api/state", () => {
         return jsonResponse({
           version,
           liteUrl: `v/${version}/state-lite.json`,
-          aiUrl: `v/${version}/state-ai.json`
+          aiUrl: `v/${version}/state-ai.json`,
+          integrity: {
+            lite: {
+              hash: liteHash,
+              sig: computeExpectedSig("state-lite.json", liteHash),
+              hashUrl: `v/${version}/state-lite.json.sha256`,
+              sigUrl: `v/${version}/state-lite.json.sig`
+            },
+            ai: {
+              hash: aiHash,
+              sig: computeExpectedSig("state-ai.json", aiHash),
+              hashUrl: `v/${version}/state-ai.json.sha256`,
+              sigUrl: `v/${version}/state-ai.json.sig`
+            }
+          }
         });
       }
-      if (requestUrl === liteUrl) {
-        return jsonResponse({
-          status: "ok",
-          routes: [],
-          indicators: []
-        });
-      }
-      if (requestUrl === aiUrl) {
-        return jsonResponse({
-          ai_analysis: { summary: "live ai" },
-          aiVersion: "2026-03-08T21:00:02+04:00",
-          aiUpdatedAt: "2026-03-08T21:00:02+04:00",
-          aiStatus: "ok"
-        });
-      }
+      if (requestUrl === liteUrl) return textResponse(liteBody);
+      if (requestUrl === aiUrl) return textResponse(aiBody);
+      if (requestUrl === buildLiveArtifactUrl("v", version, "state-lite.json.sha256")) return textResponse(`sha256:${liteHash}`);
+      if (requestUrl === buildLiveArtifactUrl("v", version, "state-lite.json.sig")) return textResponse(`sha256sig:${computeExpectedSig("state-lite.json", liteHash)}`);
+      if (requestUrl === buildLiveArtifactUrl("v", version, "state-ai.json.sha256")) return textResponse(`sha256:${aiHash}`);
+      if (requestUrl === buildLiveArtifactUrl("v", version, "state-ai.json.sig")) return textResponse(`sha256sig:${computeExpectedSig("state-ai.json", aiHash)}`);
       throw new Error(`Unexpected URL: ${requestUrl}`);
     });
 
@@ -83,14 +113,41 @@ describe("/api/state", () => {
     expect(response.statusCode).toBe(200);
     expect(JSON.parse(response.body)).toMatchObject({
       status: "ok",
-      ai_analysis: { summary: "live ai" },
-      aiVersion: "2026-03-08T21:00:02+04:00",
-      aiUpdatedAt: "2026-03-08T21:00:02+04:00",
-      aiStatus: "ok"
+      ai_analysis: { summary: "live ai" }
     });
     expect(response.headers["X-UrgentDash-Upstream"]).toBe(liteUrl);
     expect(response.headers["X-UrgentDash-AI-Upstream"]).toBe(aiUrl);
     expect(response.headers["X-UrgentDash-Publish-Source"]).toBe(FIXED_PUBLISH_SOURCE_LABEL);
     expect(response.headers["X-UrgentDash-State-Mode"]).toBe("latest-pointer-merged");
+    expect(response.headers["X-UrgentDash-Integrity"]).toBe("verified");
+  });
+
+  it("returns fallback when integrity verification fails", async () => {
+    const version = "2026-03-08T16-59-33Z";
+    const latestUrl = buildLiveArtifactUrl("latest.json");
+    const liteUrl = buildLiveArtifactUrl("v", version, "state-lite.json");
+    const legacyUrl = buildLiveArtifactUrl("hyie_state.json");
+
+    fetch.mockImplementation(async (url) => {
+      const requestUrl = String(url).replace(/\?ts=\d+$/, "");
+      if (requestUrl === latestUrl) {
+        return jsonResponse({
+          version,
+          liteUrl: `v/${version}/state-lite.json`,
+          legacyUrl: "hyie_state.json",
+          integrity: { lite: { hash: "bad", sig: "bad" } }
+        });
+      }
+      if (requestUrl === liteUrl) return jsonResponse({ status: "ok" });
+      if (requestUrl === legacyUrl) return jsonResponse({ status: "legacy" });
+      throw new Error(`Unexpected URL: ${requestUrl}`);
+    });
+
+    const response = createResponse();
+    await handler({}, response);
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body)).toMatchObject({ status: "legacy" });
+    expect(response.headers["X-UrgentDash-Integrity"]).toBe("fallback");
   });
 });

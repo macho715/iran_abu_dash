@@ -6,7 +6,8 @@ import {
   applyProxyHeaders,
   buildLiveArtifactUrl,
   getPublishSource,
-  resetPublishSourceWarningForTest
+  resetPublishSourceWarningForTest,
+  verifyBodyIntegrity
 } from "./_liveProxy.js";
 
 function createResponse() {
@@ -53,6 +54,18 @@ describe("_liveProxy", () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain("URGENTDASH_GITHUB_REPO=escapeplan");
     expect(warn.mock.calls[0][0]).toContain(FIXED_PUBLISH_SOURCE_LABEL);
+  });
+
+  it("verifies body hash and signature deterministically", () => {
+    const result = verifyBodyIntegrity(
+      "state-lite.json",
+      JSON.stringify({ status: "ok" }),
+      "c36f89f9f33b80f153f2899cce8ca2f30938efaa91fc764c0f7818f2f1d2f3f9",
+      "bad-sig"
+    );
+    expect(result.hashMatch).toBe(false);
+    expect(result.sigMatch).toBe(false);
+    expect(result.digest.length).toBe(64);
   });
 
   it("applies publish source diagnostics headers", () => {

@@ -53,6 +53,10 @@ class LivePublishTests(unittest.TestCase):
             self.assertEqual(latest["status"]["ai"], "pending")
             self.assertTrue((live_root / LATEST_FILENAME).exists())
             self.assertTrue((live_root / VERSION_DIRNAME / version / LITE_FILENAME).exists())
+            self.assertTrue((live_root / VERSION_DIRNAME / version / f"{LITE_FILENAME}.sha256").exists())
+            self.assertTrue((live_root / VERSION_DIRNAME / version / f"{LITE_FILENAME}.sig").exists())
+            self.assertIn("integrity", latest)
+            self.assertIn("provenance", latest)
 
             compat_payload = json.loads((live_root / LEGACY_FILENAME).read_text(encoding="utf-8"))
             self.assertNotIn("ai_analysis", compat_payload)
@@ -82,6 +86,8 @@ class LivePublishTests(unittest.TestCase):
             self.assertEqual(latest["status"]["ai"], "ok")
             self.assertEqual(latest["aiVersion"], "2026-03-06T05:29:00Z")
             self.assertTrue((live_root / VERSION_DIRNAME / version / AI_FILENAME).exists())
+            self.assertTrue((live_root / VERSION_DIRNAME / version / f"{AI_FILENAME}.sha256").exists())
+            self.assertTrue((live_root / VERSION_DIRNAME / version / f"{AI_FILENAME}.sig").exists())
 
             compat_payload = json.loads((live_root / LEGACY_FILENAME).read_text(encoding="utf-8"))
             self.assertIn("ai_analysis", compat_payload)
@@ -90,6 +96,7 @@ class LivePublishTests(unittest.TestCase):
             last_updated = json.loads((live_root / LAST_UPDATED_FILENAME).read_text(encoding="utf-8"))
             self.assertEqual(last_updated["version"], version)
             self.assertEqual(last_updated["ai_version"], "2026-03-06T05:29:00Z")
+            self.assertIn("ai", latest["integrity"])
 
     def test_prune_old_versions_keeps_recent_directories(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

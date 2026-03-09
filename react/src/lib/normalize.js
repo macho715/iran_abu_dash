@@ -152,9 +152,24 @@ export function normalizeMetadata(raw = {}) {
   const sourceHealth = raw?.sourceHealth ?? raw?.source_health ?? null;
   const { ok, total } = summarizeSourceHealth(sourceHealth);
   const source = normalizeWhitespace(raw?.source || "");
+  const integrityRaw = raw?.integrity ?? raw?.dataIntegrity ?? null;
+  const integrityStatus = normalizeWhitespace(
+    integrityRaw?.status ?? raw?.integrity_status ?? raw?.integrityStatus ?? "unknown"
+  ).toLowerCase();
+  const integrityVerifiedAt = normalizeWhitespace(
+    integrityRaw?.verifiedAt ?? raw?.last_integrity_verified_at ?? raw?.lastIntegrityVerifiedAt ?? ""
+  );
+  const integrityFailCount = Number.isFinite(Number(
+    integrityRaw?.failCount ?? raw?.integrity_fail_count ?? raw?.integrityFailCount
+  ))
+    ? Math.max(0, Math.trunc(Number(
+      integrityRaw?.failCount ?? raw?.integrity_fail_count ?? raw?.integrityFailCount
+    )))
+    : 0;
   return {
     stateTs, status, degraded, egressLossETA, evidenceConf, effectiveThreshold,
-    deltaScore, urgency, triggers, conflictStats, sourceHealth, sourceOk: ok, sourceTotal: total, source
+    deltaScore, urgency, triggers, conflictStats, sourceHealth, sourceOk: ok, sourceTotal: total, source,
+    integrityStatus, integrityVerifiedAt, integrityFailCount
   };
 }
 

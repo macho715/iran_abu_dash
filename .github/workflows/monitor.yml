@@ -77,6 +77,21 @@ jobs:
           print(f"run_id={payload.get('run_id', '')}")
           PY
 
+      - name: Write provenance metadata
+        if: steps.gate.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          mkdir -p live
+          cat > live/provenance.json <<JSON
+          {
+            "build_commit": "${{ github.sha }}",
+            "generated_by": "${{ github.actor }}",
+            "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "workflow_run_id": "${{ github.run_id }}",
+            "workflow": "${{ github.workflow }}"
+          }
+          JSON
+
       - name: Upload lite bundle artifact
         if: steps.gate.outputs.should_run == 'true'
         uses: actions/upload-artifact@v4
@@ -178,6 +193,21 @@ jobs:
           APPROVE_SEND: ${{ secrets.APPROVE_SEND || '' }}
         run: |
           python scripts/run_now.py --mode ai --ai-input state/ai_input.json --telegram-send
+
+      - name: Refresh provenance metadata
+        shell: bash
+        run: |
+          mkdir -p live
+          cat > live/provenance.json <<JSON
+          {
+            "build_commit": "${{ github.sha }}",
+            "generated_by": "${{ github.actor }}",
+            "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "workflow_run_id": "${{ github.run_id }}",
+            "workflow": "${{ github.workflow }}",
+            "stage": "ai"
+          }
+          JSON
 
       - name: Publish AI bundle to urgentdash-live and prune old versions
         shell: bash

@@ -184,6 +184,8 @@ def health():
         "counts": data.get("counts") or {},
         "last_error": data.get("last_error"),
         "source_health": data.get("source_health") or {},
+        "last_integrity_verified_at": data.get("last_integrity_verified_at"),
+        "integrity_fail_count": int(data.get("integrity_fail_count", 0) or 0),
     }
 
 

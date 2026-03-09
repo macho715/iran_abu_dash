@@ -89,6 +89,11 @@ export default function DashboardHeader({
           <div className="header-actions">
             <Pill label="MODE" value={derived.modeState} color={derived.modeColor} />
             <Pill
+              label="Integrity"
+              value={`${derived.integrityLabel}${derived.integrityFailCount ? `/${derived.integrityFailCount}` : ""}`}
+              color={derived.integrityColor}
+            />
+            <Pill
               label="Gate"
               value={derived.gateState}
               color={derived.gateState === "BLOCKED" ? "#ef4444" : derived.gateState === "CAUTION" ? "#f59e0b" : "#22c55e"}
