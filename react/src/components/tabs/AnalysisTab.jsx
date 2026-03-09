@@ -23,7 +23,7 @@ export default function AnalysisTab({
   const labels = history.map((point) => point.stateTs || point.ts || "");
 
   return (
-    <div>
+    <div className="analysis-layout">
       <Card>
         <div className="split-header">
           <div>
@@ -60,7 +60,7 @@ export default function AnalysisTab({
         <HistoryPlayback history={history} selectedIndex={selectedHistoryIndex} onSelect={onSelectHistoryIndex} />
       </Card>
 
-      <Card style={{ marginBottom: 0 }}>
+      <Card>
         <TimelinePanel timeline={timeline} onClear={onClearTimeline} onExport={onExportTimeline} />
       </Card>
     </div>
