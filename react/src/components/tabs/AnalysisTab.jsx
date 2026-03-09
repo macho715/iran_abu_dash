@@ -21,6 +21,7 @@ export default function AnalysisTab({
   onSelectHistoryIndex
 }) {
   const labels = history.map((point) => point.stateTs || point.ts || "");
+  const decisionLogs = (timeline || []).filter((event) => event.category === "DECISION_TRACE");
 
   return (
     <div>
@@ -61,6 +62,24 @@ export default function AnalysisTab({
       </Card>
 
       <Card style={{ marginBottom: 0 }}>
+        <div className="split-header" style={{ marginBottom: 12 }}>
+          <div>
+            <div className="section-title">🧾 Decision Trace Review</div>
+            <div className="section-subtitle">Simulator에서 저장한 판단 근거 로그 {decisionLogs.length}건</div>
+          </div>
+        </div>
+
+        {decisionLogs.length ? (
+          <div className="stack-list" style={{ marginBottom: 16, maxHeight: 180, overflowY: "auto" }}>
+            {decisionLogs.slice(0, 8).map((event) => (
+              <div key={event.id} className="nested-panel" style={{ marginBottom: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#e2e8f0" }}>{event.title}</div>
+                <div style={{ marginTop: 6, fontSize: 11, color: "#94a3b8", whiteSpace: "pre-wrap" }}>{event.detail}</div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         <TimelinePanel timeline={timeline} onClear={onClearTimeline} onExport={onExportTimeline} />
       </Card>
     </div>

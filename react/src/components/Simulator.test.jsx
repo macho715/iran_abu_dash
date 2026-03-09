@@ -32,11 +32,16 @@ describe("Simulator", () => {
     expect(screen.getAllByText("항공 제외, Route R1 권장")[0]).toBeInTheDocument();
     expect(screen.getByText("상황 영공 폐쇄")).toBeInTheDocument();
     expect(screen.getAllByText("폐쇄").length).toBeGreaterThan(0);
-    expect(onLog).toHaveBeenCalledTimes(1);
+    expect(onLog).toHaveBeenCalledTimes(2);
     expect(onLog.mock.calls[0][0]).toMatchObject({
       category: "SIM",
       title: "긴급 판단 갱신 · 항공 제외, Route R1 권장",
       level: "ALERT",
+    });
+    expect(onLog.mock.calls[1][0]).toMatchObject({
+      category: "DECISION_TRACE",
+      title: "판단 근거 로그 · 항공 제외, Route R1 권장",
+      level: "INFO",
     });
   });
 
@@ -77,9 +82,9 @@ describe("Simulator", () => {
     const { rerender } = render(<Simulator liveDash={dash} onLog={onLog} />);
 
     fireEvent.click(screen.getByRole("button", { name: /공습 징후/i }));
-    expect(onLog).toHaveBeenCalledTimes(1);
+    expect(onLog).toHaveBeenCalledTimes(2);
 
     rerender(<Simulator liveDash={dash} onLog={onLog} />);
-    expect(onLog).toHaveBeenCalledTimes(1);
+    expect(onLog).toHaveBeenCalledTimes(2);
   });
 });

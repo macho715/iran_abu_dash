@@ -85,5 +85,9 @@ describe("deriveState", () => {
     expect(derived.airspaceState).toBe("CLOSED");
     expect(derived.airspaceSegment).toBe("CLOSED");
     expect(derived.evidenceFloorPassed).toBe(true);
+    expect(derived.decisionTrace.summary.modeState).toBe("RED_PREP");
+    expect(derived.decisionTrace.triggerBreakdown.find((item) => item.id === "kr_leave_immediately")?.active).toBe(true);
+    expect(derived.decisionTrace.thresholdBreakdown.deltaScore.passed).toBe(true);
+    expect(derived.decisionTrace.scoreBreakdown.leadHypothesisId).toBe("H2");
   });
 });

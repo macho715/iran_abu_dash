@@ -52,6 +52,10 @@ function createInitialUiState() {
     urgency: "",
     constraints: [],
     routeOverrides: {},
+    whatIf: {
+      ecDelta: 0,
+      dsDelta: 0,
+    },
   };
 }
 
@@ -448,6 +452,15 @@ function applyUiToSim(baseSim, ui) {
     applyConstraintPreset(next, constraintId);
   });
 
+  const ecDelta = Number(ui.whatIf?.ecDelta || 0);
+  const dsDelta = Number(ui.whatIf?.dsDelta || 0);
+  if (Number.isFinite(ecDelta) && ecDelta !== 0) {
+    next.evidenceConf = clamp01(Number(next.evidenceConf || 0) + ecDelta);
+  }
+  if (Number.isFinite(dsDelta) && dsDelta !== 0) {
+    next.deltaScore = Number(next.deltaScore || 0) + dsDelta;
+  }
+
   applyRouteOverrides(next, ui.routeOverrides);
 
   return next;
@@ -576,6 +589,12 @@ function buildActionSummary({ derived, routes, baselineRoutes, ui, sim }) {
 
   const urgencyCopy = getUrgencyCopy(ui, sim);
   const reasons = collectReasons(derived, routes);
+  const evidenceLinks = [
+    `indicator:I02(${derived.airspaceState})`,
+    `indicator:I01/I03/I04(${derived.gateState})`,
+    `hypothesis:H2(${derived.h2Score.toFixed(2)})`,
+    `metadata:Conf(${derived.ec.toFixed(2)})/Δ(${derived.ds.toFixed(2)})`,
+  ];
   const deltaCopy = Number.isFinite(delta) && Math.abs(delta) >= 0.1
     ? `현재 기준 ${delta > 0 ? "+" : ""}${delta.toFixed(1)}h`
     : "현재 기준과 유사";
@@ -586,6 +605,7 @@ function buildActionSummary({ derived, routes, baselineRoutes, ui, sim }) {
       title: "즉시 대기",
       detail: `사용 가능한 육로가 없습니다. ${urgencyCopy}.`,
       reason: reasons.join(" + "),
+      evidenceLinks,
       bestRouteId: null,
       bestRoute: null,
     };
@@ -597,6 +617,7 @@ function buildActionSummary({ derived, routes, baselineRoutes, ui, sim }) {
       title: `항공 제외, ${routeLabel(bestRoute)} 권장`,
       detail: `예상 ${formatEta(bestRoute.eff)} · ${urgencyCopy} · ${deltaCopy}`,
       reason: reasons.join(" + "),
+      evidenceLinks,
       bestRouteId: bestRoute.id,
       bestRoute,
     };
@@ -608,6 +629,7 @@ function buildActionSummary({ derived, routes, baselineRoutes, ui, sim }) {
       title: `우회 이동, ${routeLabel(bestRoute)} 우선`,
       detail: `기본 경로 차단 신호가 강합니다. 예상 ${formatEta(bestRoute.eff)} · ${urgencyCopy} · ${deltaCopy}`,
       reason: reasons.join(" + "),
+      evidenceLinks,
       bestRouteId: bestRoute.id,
       bestRoute,
     };
@@ -619,6 +641,7 @@ function buildActionSummary({ derived, routes, baselineRoutes, ui, sim }) {
       title: "조건부 이동",
       detail: `${routeLabel(bestRoute)} 우선 검토 · 예상 ${formatEta(bestRoute.eff)} · ${urgencyCopy} · ${deltaCopy}`,
       reason: reasons.join(" + "),
+      evidenceLinks,
       bestRouteId: bestRoute.id,
       bestRoute,
     };
@@ -629,6 +652,7 @@ function buildActionSummary({ derived, routes, baselineRoutes, ui, sim }) {
     title: "이동 가능",
     detail: `${routeLabel(bestRoute)} 기준 예상 ${formatEta(bestRoute.eff)} · ${urgencyCopy} · ${deltaCopy}`,
     reason: reasons.join(" + "),
+    evidenceLinks,
     bestRouteId: bestRoute.id,
     bestRoute,
   };
@@ -649,6 +673,8 @@ function hasUserInput(ui) {
     Boolean(ui.scope) ||
     Boolean(ui.urgency) ||
     (ui.constraints || []).length > 0 ||
+    Math.abs(Number(ui.whatIf?.ecDelta || 0)) > 0 ||
+    Math.abs(Number(ui.whatIf?.dsDelta || 0)) > 0 ||
     hasRouteOverride
   );
 }
@@ -662,6 +688,9 @@ function buildSelectionSummary(ui) {
   if (scenario && scenario.id !== "current") parts.push(scenario.label);
   if (scope) parts.push(scope.label);
   if (urgency) parts.push(urgency.label);
+  if (Math.abs(Number(ui.whatIf?.ecDelta || 0)) > 0 || Math.abs(Number(ui.whatIf?.dsDelta || 0)) > 0) {
+    parts.push(`What-if EC ${Number(ui.whatIf?.ecDelta || 0) >= 0 ? "+" : ""}${Number(ui.whatIf?.ecDelta || 0).toFixed(2)} / Δ ${Number(ui.whatIf?.dsDelta || 0) >= 0 ? "+" : ""}${Number(ui.whatIf?.dsDelta || 0).toFixed(2)}`);
+  }
 
   (ui.constraints || []).forEach((constraintId) => {
     const constraint = CONSTRAINTS.find((item) => item.id === constraintId);
@@ -871,6 +900,26 @@ function RouteOverrideRow({
   );
 }
 
+function WhatIfSlider({ label, min, max, step, value, onChange }) {
+  return (
+    <div>
+      <div className="split-header" style={{ marginBottom: 6 }}>
+        <div className="section-subtitle">{label}</div>
+        <div className="status-chip is-muted">{value >= 0 ? "+" : ""}{value.toFixed(2)}</div>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value || 0))}
+        style={{ width: "100%" }}
+      />
+    </div>
+  );
+}
+
 export default function Simulator({ liveDash, onLog = () => {} }) {
   const [ui, setUi] = useState(createInitialUiState());
   const lastLogSignatureRef = useRef("");
@@ -950,6 +999,7 @@ export default function Simulator({ liveDash, onLog = () => {} }) {
       gateState: simDerived.gateState,
       airspaceState: simDerived.airspaceState,
       modeState: simDerived.modeState,
+      whatIf: ui.whatIf,
     });
 
     if (signature === lastLogSignatureRef.current) return;
@@ -961,6 +1011,20 @@ export default function Simulator({ liveDash, onLog = () => {} }) {
       title: `긴급 판단 갱신 · ${action.title}`,
       detail: `${buildSelectionSummary(ui)} | ${action.detail} | 이유: ${action.reason}`,
       noiseKey: `SIM|QUICK_DECISION|${action.title}|${action.bestRouteId ?? "NONE"}`,
+    });
+
+    onLog({
+      level: "INFO",
+      category: "DECISION_TRACE",
+      title: `판단 근거 로그 · ${action.title}`,
+      detail: [
+        `selection=${buildSelectionSummary(ui)}`,
+        `trigger=${simDerived.decisionTrace.triggerBreakdown.map((item) => `${item.id}:${item.active ? "Y" : "N"}`).join(",")}`,
+        `confidence=${simDerived.decisionTrace.thresholdBreakdown.evidence.confidence.toFixed(3)} threshold=${simDerived.decisionTrace.thresholdBreakdown.evidence.threshold.toFixed(3)} delta=${simDerived.decisionTrace.thresholdBreakdown.evidence.delta.toFixed(3)}`,
+        `deltaScore=${simDerived.decisionTrace.thresholdBreakdown.deltaScore.score.toFixed(3)} threshold=${simDerived.decisionTrace.thresholdBreakdown.deltaScore.threshold.toFixed(3)} gap=${simDerived.decisionTrace.thresholdBreakdown.deltaScore.delta.toFixed(3)}`,
+        `evidenceLinks=${action.evidenceLinks.join(" | ")}`,
+      ].join("\n"),
+      noiseKey: `SIM|TRACE|${action.title}|${action.bestRouteId ?? "NONE"}`,
     });
   }, [action, onLog, simDerived, ui]);
 
@@ -1050,6 +1114,16 @@ export default function Simulator({ liveDash, onLog = () => {} }) {
     lastLogSignatureRef.current = "";
   };
 
+  const setWhatIf = (key, value) => {
+    setUi((prev) => ({
+      ...prev,
+      whatIf: {
+        ...(prev.whatIf || {}),
+        [key]: Number(value || 0),
+      },
+    }));
+  };
+
   return (
     <Card>
       <div className="split-header">
@@ -1105,6 +1179,9 @@ export default function Simulator({ liveDash, onLog = () => {} }) {
           }}
         >
           왜? {action.reason}
+        </div>
+        <div style={{ marginTop: 8, fontSize: 11, color: "#bfdbfe" }}>
+          Evidence: {action.evidenceLinks.join(" · ")}
         </div>
 
         <div className="filter-row" style={{ marginTop: 12 }}>
@@ -1185,6 +1262,29 @@ export default function Simulator({ liveDash, onLog = () => {} }) {
                 ))}
               </div>
             </div>
+
+            <div className="section-gap">
+              <div className="section-title">가정 변경 시 결과 (What-if)</div>
+              <div className="section-subtitle">EC/ΔScore를 가정값으로 조정해 결과 민감도를 확인합니다.</div>
+              <div className="stack-list section-gap-top">
+                <WhatIfSlider
+                  label="Evidence Confidence (ec) Δ"
+                  min={-0.3}
+                  max={0.3}
+                  step={0.01}
+                  value={Number(ui.whatIf?.ecDelta || 0)}
+                  onChange={(value) => setWhatIf("ecDelta", value)}
+                />
+                <WhatIfSlider
+                  label="Delta Score (ds) Δ"
+                  min={-0.3}
+                  max={0.3}
+                  step={0.01}
+                  value={Number(ui.whatIf?.dsDelta || 0)}
+                  onChange={(value) => setWhatIf("dsDelta", value)}
+                />
+              </div>
+            </div>
           </div>
 
           <details className="nested-panel">
@@ -1211,6 +1311,33 @@ export default function Simulator({ liveDash, onLog = () => {} }) {
         </div>
 
         <div className="stack-list">
+          <div className="nested-panel">
+            <div className="section-title">판단 근거</div>
+            <div className="section-subtitle">trigger hit, confidence, delta를 단계별로 표시합니다.</div>
+            <div className="stack-list section-gap-top">
+              {simDerived.decisionTrace.triggerBreakdown.map((item) => (
+                <div key={item.id} className="route-summary-row">
+                  <div style={{ fontSize: 12, fontWeight: 800 }}>{item.label}</div>
+                  <div className={item.active ? "status-chip is-active" : "status-chip is-muted"}>{item.active ? "HIT" : "MISS"}</div>
+                </div>
+              ))}
+            </div>
+            <div className="two-col section-gap-top">
+              <MetricTile
+                label="Confidence"
+                value={`${simDerived.decisionTrace.thresholdBreakdown.evidence.confidence.toFixed(3)}`}
+                meta={`Th ${simDerived.decisionTrace.thresholdBreakdown.evidence.threshold.toFixed(3)} / Δ ${simDerived.decisionTrace.thresholdBreakdown.evidence.delta.toFixed(3)}`}
+                color={simDerived.decisionTrace.thresholdBreakdown.evidence.passed ? "#4ade80" : "#fbbf24"}
+              />
+              <MetricTile
+                label="ΔScore"
+                value={`${simDerived.decisionTrace.thresholdBreakdown.deltaScore.score.toFixed(3)}`}
+                meta={`Th ${simDerived.decisionTrace.thresholdBreakdown.deltaScore.threshold.toFixed(3)} / Δ ${simDerived.decisionTrace.thresholdBreakdown.deltaScore.delta.toFixed(3)}`}
+                color={simDerived.decisionTrace.thresholdBreakdown.deltaScore.passed ? "#4ade80" : "#fbbf24"}
+              />
+            </div>
+          </div>
+
           <div className="nested-panel">
             <div className="section-title">현재 판단</div>
             <div className="two-col section-gap-top">
