@@ -80,6 +80,8 @@ class HealthApiTests(unittest.TestCase):
                     "counts": {"new_count": 1, "total_count": 3, "unique_count": 1},
                     "last_article_count": 1,
                     "source_health": {"tier0_demo": {"ok": True}},
+                    "last_integrity_verified_at": "2026-03-06T05:31:00Z",
+                    "integrity_fail_count": 2,
                 }
             ),
             encoding="utf-8",
@@ -110,6 +112,8 @@ class HealthApiTests(unittest.TestCase):
         self.assertEqual(payload["last_ai_success_at"], "2026-03-06T09:30:00+04:00")
         self.assertEqual(payload["last_lite_duration_ms"], 1200)
         self.assertEqual(payload["last_ai_duration_ms"], 4500)
+        self.assertEqual(payload["last_integrity_verified_at"], "2026-03-06T05:31:00Z")
+        self.assertEqual(payload["integrity_fail_count"], 2)
 
     def test_live_endpoints_and_compat_state_use_live_bundle(self) -> None:
         latest = self.client.get("/api/live/latest")

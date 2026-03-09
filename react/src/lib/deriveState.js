@@ -115,6 +115,26 @@ export function deriveState(dash, egressLossETAOverride) {
       ? `${sourceOk}/${sourceTotal} ok`
       : "n/a";
 
+  const integrityStatus = String(dash?.metadata?.integrityStatus || "unknown").toLowerCase();
+  const integrityVerifiedAt = String(dash?.metadata?.integrityVerifiedAt || "");
+  const integrityFailCount = Number.isFinite(Number(dash?.metadata?.integrityFailCount))
+    ? Math.max(0, Math.trunc(Number(dash?.metadata?.integrityFailCount)))
+    : 0;
+  const integrityLabel = integrityStatus === "verified"
+    ? "VERIFIED"
+    : integrityStatus === "fallback"
+      ? "FALLBACK"
+      : integrityStatus === "failed"
+        ? "FAILED"
+        : "UNKNOWN";
+  const integrityColor = integrityLabel === "VERIFIED"
+    ? "#22c55e"
+    : integrityLabel === "FALLBACK"
+      ? "#f59e0b"
+      : integrityLabel === "FAILED"
+        ? "#ef4444"
+        : "#6b7280";
+
   const dsGap = 0.20 - ds;
   const dsGapLabel = ds >= 0.20 ? `ΔScore 임계 초과 +${Math.abs(dsGap).toFixed(3)}` : `0.20까지 ${Math.abs(dsGap).toFixed(3)} 차이`;
   const dsStateIcon = ds >= 0.20 ? "✅" : "⚠";
@@ -216,6 +236,7 @@ export function deriveState(dash, egressLossETAOverride) {
     conflictStats, conflictDayLabel, conflictSourceLabel,
     liveLagSeconds, liveLagMinutes, liveStale, staleSeverity, staleWarningVisible,
     sourceHealthLabel, liveSource,
+    integrityLabel, integrityColor, integrityVerifiedAt, integrityFailCount,
     dsGapLabel, dsStateIcon, dsActionLabel, confDeltaLabel,
     escalationItems, deEscalationItems,
     decisionTrace,
