@@ -141,6 +141,64 @@ export function deriveState(dash, egressLossETAOverride) {
     { text: "Evidence 대비 Threshold 하향 안정", ok: ec < effectiveThreshold && ds < 0.20, note: `confΔ=${(ec - effectiveThreshold).toFixed(3)}` }
   ];
 
+  const triggerBreakdown = [
+    { id: "kr_leave_immediately", label: "대사관 즉시 출국", active: Boolean(triggers.kr_leave_immediately), source: "trigger.kr_leave_immediately" },
+    { id: "strike_detected", label: "strike 감지", active: Boolean(triggers.strike_detected), source: "trigger.strike_detected" },
+    { id: "border_change", label: "국경 통제", active: Boolean(triggers.border_change), source: "trigger.border_change" },
+    { id: "red_imminent", label: "RED 임박", active: Boolean(triggers.red_imminent), source: "trigger.red_imminent" },
+  ];
+
+  const thresholdBreakdown = {
+    evidence: {
+      confidence: ec,
+      threshold: effectiveThreshold,
+      delta: confDelta,
+      passed: ec >= effectiveThreshold,
+      source: "metadata.evidenceConf/effectiveThreshold",
+    },
+    deltaScore: {
+      score: ds,
+      threshold: 0.2,
+      delta: ds - 0.2,
+      passed: ds >= 0.2,
+      source: "metadata.deltaScore",
+    },
+    gate: {
+      active: gateActiveCount,
+      cautionThreshold: 1,
+      blockedThreshold: 2,
+      state: gateState,
+      source: "I01/I03/I04 + triggers",
+    },
+  };
+
+  const scoreBreakdown = {
+    hypotheses: hypothesesSorted.map((item) => ({
+      id: item.id,
+      score: safeNumber(item?.score, 0),
+      source: `hypothesis.${item.id}`,
+    })),
+    indicators: [i01, i02, i03, i04].map((item) => ({
+      id: item?.id,
+      state: clamp01(item?.state),
+      source: `indicator.${item?.id || "?"}`,
+    })),
+    leadHypothesisId: leadingHypothesis.id,
+    leadHypothesisScore: safeNumber(leadingHypothesis?.score, 0),
+  };
+
+  const decisionTrace = {
+    summary: {
+      modeState,
+      gateState,
+      evidenceState,
+      airspaceState,
+    },
+    triggerBreakdown,
+    thresholdBreakdown,
+    scoreBreakdown,
+  };
+
   return {
     i01, i02, i03, i04,
     hypothesesSorted, leadingHypothesis, leadingColor,
@@ -159,6 +217,7 @@ export function deriveState(dash, egressLossETAOverride) {
     liveLagSeconds, liveLagMinutes, liveStale, staleSeverity, staleWarningVisible,
     sourceHealthLabel, liveSource,
     dsGapLabel, dsStateIcon, dsActionLabel, confDeltaLabel,
-    escalationItems, deEscalationItems
+    escalationItems, deEscalationItems,
+    decisionTrace,
   };
 }
