@@ -264,6 +264,12 @@ textarea:focus-visible {
   gap: 10px;
 }
 
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .route-layout,
 .sim-grid {
   display: grid;
@@ -706,6 +712,12 @@ textarea:focus-visible {
   color: #93c5fd !important;
 }
 
+@media (max-width: 1024px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
   :root {
     --map-h: 240px;
@@ -717,6 +729,7 @@ textarea:focus-visible {
 
   .gauge-grid,
   .two-col,
+  .stat-grid,
   .route-layout,
   .sim-grid,
   .route-card__metrics {
