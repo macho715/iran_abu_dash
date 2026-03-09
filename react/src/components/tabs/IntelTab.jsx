@@ -3,6 +3,7 @@ import TabStatePanel from "../TabStatePanel.jsx";
 import { Card } from "../ui.jsx";
 import { countIntelStatuses } from "../../lib/intelStatus.js";
 import { formatTimeGST } from "../../lib/utils.js";
+import { getIntelPriorityTheme, getRepeatedTheme } from "../../lib/statusTheme.js";
 
 const FILTERS = ["ALL", "CRITICAL", "HIGH", "MEDIUM"];
 
@@ -59,38 +60,23 @@ export default function IntelTab({ allIntelFeed = [], filteredIntelFeed = [], in
           {filteredIntelFeed.map((item) => {
             const isRepeated = item.status === "repeated";
             const staleLabel = isRepeated ? staleDurationLabel(item.firstSeenTs) : null;
+            const priorityTheme = getIntelPriorityTheme(item.priority);
+            const repeatedTheme = getRepeatedTheme();
 
             return (
               <div
                 key={item.id}
-                className="intel-card"
-                style={{
-                  borderLeft: item.priority === "CRITICAL" ? "3px solid #ef4444" : "1px solid var(--border-default)",
-                  opacity: isRepeated ? 0.7 : 1,
-                }}
+                className={`intel-card ${priorityTheme.className} ${isRepeated ? repeatedTheme.className : ""}`.trim()}
               >
                 <div className="split-header">
                   <div className="section-subtitle">{formatTimeGST(item.tsIso)}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div className="inline-row">
                     {isRepeated && (
-                      <span
-                        style={{
-                          fontSize: 10,
-                          padding: "1px 5px",
-                          borderRadius: 3,
-                          background: "rgba(148,163,184,0.15)",
-                          color: "#94a3b8",
-                        }}
-                      >
+                      <span className="status-tag is-repeated">
                         변동없음{staleLabel ? ` ${staleLabel}` : ""}
                       </span>
                     )}
-                    <div
-                      className="priority-label"
-                      style={{
-                        color: item.priority === "CRITICAL" ? "#ef4444" : item.priority === "HIGH" ? "#f59e0b" : "#94a3b8"
-                      }}
-                    >
+                    <div className={`priority-label ${priorityTheme.className}`}>
                       {item.priority}
                     </div>
                   </div>
