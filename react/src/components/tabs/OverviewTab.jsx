@@ -66,8 +66,8 @@ export default function OverviewTab({
       </Card>
 
       <Card>
-        <div className="section-title section-gap-bottom">Conflict Stats</div>
-        <div className="stat-grid">
+        <div className="section-title">Conflict Stats</div>
+        <div className="stat-grid section-gap">
           <div className="metric-card">
             <div className="metric-card__label">Missiles</div>
             <div className="metric-card__value">{stat(derived.conflictStats.missiles_total)}</div>
