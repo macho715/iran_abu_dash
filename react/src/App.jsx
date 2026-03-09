@@ -36,6 +36,7 @@ export default function App() {
         isOffline={dashboard.isOffline}
         stateTs={dashboard.dash?.metadata?.stateTs}
         sourceHealthLabel={dashboard.derived.sourceHealthLabel}
+        liveConnectionStatus={dashboard.liveConnectionStatus}
       />
 
       <TabBar tabs={dashboard.tabs} activeTab={dashboard.tab} onChange={dashboard.setTab} />

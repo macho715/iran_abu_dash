@@ -9,7 +9,7 @@ import { requestNotifPermission, sendCrisisNotif } from "../lib/notifications.js
 import { buildFullReport, buildOfflineSummary } from "../lib/summary.js";
 import { alertSound, warnSound } from "../lib/sounds.js";
 import { appendHistory, buildDiffEvents, computeDashboardKey, mkEvent } from "../lib/timelineRules.js";
-import { fetchLatestPointer, fetchPointerArtifact } from "../lib/livePointer.js";
+import { connectLivePointerStream, fetchLatestPointer, fetchPointerArtifact } from "../lib/livePointer.js";
 import {
   FALLBACK_EGRESS_LOSS_ETA,
   DATA_REVALIDATION_POLICY,
@@ -35,6 +35,8 @@ import {
 } from "../lib/utils.js";
 
 const FAST_FAIL_THRESHOLD = 5;
+const SSE_FALLBACK_RETRY_MS = 15000;
+const SAFETY_POLL_MS = 7 * 60 * 1000;
 
 const TABS = [
   { id: "overview", label: "Overview", icon: "📊" },
@@ -75,6 +77,7 @@ export function useDashboardData() {
   const [cachedAt, setCachedAt] = useState(null);
   const [isOffline, setIsOffline] = useState(typeof navigator !== "undefined" ? !navigator.onLine : false);
   const [selectedHistoryIndex, setSelectedHistoryIndex] = useState(0);
+  const [liveConnectionStatus, setLiveConnectionStatus] = useState("fallback");
 
   const mounted = useRef(true);
   const synced = useRef(false);
@@ -82,12 +85,12 @@ export function useDashboardData() {
   const prevDashRef = useRef(null);
   const prevDerivedRef = useRef(null);
   const didStartTicker = useRef(false);
-  const didStartPolling = useRef(false);
   const fastFailCountRef = useRef(0);
   const fastFailLoggedRef = useRef(false);
   const latestVersionRef = useRef("");
   const latestAiVersionRef = useRef("");
   const lastSummaryKeyRef = useRef("");
+  const sseFallbackTimerRef = useRef(null);
 
   const fastPollMs = useMemo(() => {
     const env = Number(import.meta?.env?.VITE_FAST_POLL_MS);
@@ -95,6 +98,7 @@ export function useDashboardData() {
     return DATA_REVALIDATION_POLICY.pollIntervalMs;
   }, []);
   const fastCountdownSeconds = useMemo(() => Math.max(1, Math.ceil(fastPollMs / 1000)), [fastPollMs]);
+  const relaxedPollMs = useMemo(() => Math.max(fastPollMs * 3, 30000), [fastPollMs]);
   const latestCandidates = useMemo(() => getLatestCandidates(), []);
   const legacyCandidates = useMemo(
     () => [...new Set([...getFastStateCandidates(), ...getDashboardCandidates()])],
@@ -257,6 +261,36 @@ export function useDashboardData() {
     return true;
   }, []);
 
+  const syncFromPointer = useCallback(async (pointer, { forceLite = false } = {}) => {
+    if (!pointer) throw new Error("Latest pointer unavailable");
+    if ((forceLite || pointer.version !== latestVersionRef.current || !synced.current) && pointer.liteUrl) {
+      const litePayload = await fetchPointerArtifact(pointer.liteUrl);
+      const normalized = normalizeIncomingPayload(litePayload);
+      if (!normalized) throw new Error("Invalid lite snapshot");
+      if (!mounted.current) return;
+      if (normalized.metadata) normalized.metadata.source = pointer.liteUrl;
+      const merged = applyDashboard(normalized);
+      await cacheLastDash(merged);
+      latestVersionRef.current = pointer.version;
+      latestAiVersionRef.current = "";
+    }
+
+    if (pointer.aiVersion && pointer.aiUrl && pointer.aiVersion !== latestAiVersionRef.current) {
+      const aiPayload = await fetchPointerArtifact(pointer.aiUrl);
+      if (aiPayload) {
+        applyAiAnalysis(aiPayload);
+        latestAiVersionRef.current = pointer.aiVersion;
+      }
+    } else if (!pointer.aiVersion && latestAiVersionRef.current) {
+      latestAiVersionRef.current = "";
+      setDash((prev) => {
+        const next = prev?.aiAnalysis ? { ...prev, aiAnalysis: null } : prev;
+        dashRef.current = next;
+        return next;
+      });
+    }
+  }, [applyAiAnalysis, applyDashboard]);
+
   const fetchLatestState = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true);
 
@@ -264,32 +298,7 @@ export function useDashboardData() {
       const pointer = await fetchLatestPointer(latestCandidates);
       if (!pointer) throw new Error("Latest pointer unavailable");
 
-      if (pointer.version !== latestVersionRef.current || !synced.current) {
-        const litePayload = await fetchPointerArtifact(pointer.liteUrl);
-        const normalized = normalizeIncomingPayload(litePayload);
-        if (!normalized) throw new Error("Invalid lite snapshot");
-        if (!mounted.current) return;
-        if (normalized.metadata) normalized.metadata.source = pointer.liteUrl;
-        const merged = applyDashboard(normalized);
-        await cacheLastDash(merged);
-        latestVersionRef.current = pointer.version;
-        latestAiVersionRef.current = "";
-      }
-
-      if (pointer.aiVersion && pointer.aiUrl && pointer.aiVersion !== latestAiVersionRef.current) {
-        const aiPayload = await fetchPointerArtifact(pointer.aiUrl);
-        if (aiPayload) {
-          applyAiAnalysis(aiPayload);
-          latestAiVersionRef.current = pointer.aiVersion;
-        }
-      } else if (!pointer.aiVersion && latestAiVersionRef.current) {
-        latestAiVersionRef.current = "";
-        setDash((prev) => {
-          const next = prev?.aiAnalysis ? { ...prev, aiAnalysis: null } : prev;
-          dashRef.current = next;
-          return next;
-        });
-      }
+      await syncFromPointer(pointer);
 
       if (!mounted.current) return;
       setLastUpdated(new Date());
@@ -371,7 +380,7 @@ export function useDashboardData() {
     } finally {
       if (showLoading && mounted.current) setLoading(false);
     }
-  }, [applyAiAnalysis, applyDashboard, fastCountdownSeconds, fetchCandidates, latestCandidates, legacyCandidates, logEvent]);
+  }, [fastCountdownSeconds, fetchCandidates, latestCandidates, legacyCandidates, logEvent, syncFromPointer]);
 
   useEffect(() => {
     if (didStartTicker.current) return;
@@ -384,12 +393,74 @@ export function useDashboardData() {
   }, [fastCountdownSeconds]);
 
   useEffect(() => {
-    if (didStartPolling.current) return;
-    didStartPolling.current = true;
-    fetchLatestState(true);
-    const intervalId = setInterval(() => fetchLatestState(false), fastPollMs);
+    void fetchLatestState(true);
+  }, [fetchLatestState]);
+
+  useEffect(() => {
+    const intervalId = setInterval(
+      () => fetchLatestState(false),
+      liveConnectionStatus === "connected" ? relaxedPollMs : fastPollMs
+    );
     return () => clearInterval(intervalId);
-  }, [fastPollMs, fetchLatestState]);
+  }, [fastPollMs, fetchLatestState, liveConnectionStatus, relaxedPollMs]);
+
+  useEffect(() => {
+    let hasConnected = false;
+    const stop = connectLivePointerStream({
+      candidates: latestCandidates,
+      onStatus: (status) => {
+        if (!mounted.current) return;
+        if (status === "connected") {
+          hasConnected = true;
+          setLiveConnectionStatus("connected");
+          if (sseFallbackTimerRef.current) {
+            clearTimeout(sseFallbackTimerRef.current);
+            sseFallbackTimerRef.current = null;
+          }
+          return;
+        }
+        setLiveConnectionStatus((prev) => (prev === "connected" ? "reconnecting" : prev));
+      },
+      onVersion: async (event) => {
+        if (!mounted.current) return;
+        if (!event?.version || event.version === latestVersionRef.current) return;
+        try {
+          const pointer = await fetchLatestPointer(latestCandidates);
+          await syncFromPointer(pointer, { forceLite: true });
+          setLastUpdated(new Date());
+          setNextEta(fastCountdownSeconds);
+          setError(null);
+        } catch {
+          setLiveConnectionStatus("fallback");
+        }
+      },
+      onError: () => {
+        if (!mounted.current) return;
+        setLiveConnectionStatus((prev) => (prev === "connected" ? "reconnecting" : prev));
+      }
+    });
+
+    sseFallbackTimerRef.current = setTimeout(() => {
+      if (mounted.current && !hasConnected) {
+        setLiveConnectionStatus("fallback");
+      }
+    }, SSE_FALLBACK_RETRY_MS);
+
+    return () => {
+      stop();
+      if (sseFallbackTimerRef.current) {
+        clearTimeout(sseFallbackTimerRef.current);
+        sseFallbackTimerRef.current = null;
+      }
+    };
+  }, [fastCountdownSeconds, latestCandidates, syncFromPointer]);
+
+  useEffect(() => {
+    const safetyPollId = setInterval(() => {
+      void fetchLatestState(false);
+    }, SAFETY_POLL_MS);
+    return () => clearInterval(safetyPollId);
+  }, [fetchLatestState]);
 
   useEffect(() => {
     if (!autoSummary) return;
@@ -560,6 +631,7 @@ export function useDashboardData() {
     now,
     nextEta,
     fastCountdownSeconds,
+    liveConnectionStatus,
     dash,
     derived,
     egressLossETA,

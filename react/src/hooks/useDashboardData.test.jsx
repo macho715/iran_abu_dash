@@ -60,7 +60,8 @@ vi.mock("../lib/livePointer.js", () => ({
   fetchLatestPointer: vi.fn(async () => {
     throw new Error("pointer offline");
   }),
-  fetchPointerArtifact: vi.fn(async () => null)
+  fetchPointerArtifact: vi.fn(async () => null),
+  connectLivePointerStream: vi.fn(() => () => {})
 }));
 
 vi.mock("../lib/offlineCache.js", () => ({

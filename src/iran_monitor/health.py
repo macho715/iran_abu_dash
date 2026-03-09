@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 import structlog
 
 from .config import settings
@@ -154,6 +154,20 @@ async def _ensure_live_bundle(reason: str) -> dict[str, Any] | None:
     return await _refresh_live_bundle(reason)
 
 
+def _latest_version_snapshot() -> dict[str, Any] | None:
+    payload = _read_live_file(LATEST_FILENAME)
+    if not payload:
+        return None
+    version = str(payload.get("version") or "").strip()
+    if not version:
+        return None
+    return {
+        "version": version,
+        "collectedAt": payload.get("collectedAt") or payload.get("collected_at"),
+        "stateTs": payload.get("stateTs") or payload.get("state_ts"),
+    }
+
+
 @app.get("/health")
 def health():
     """마지막 파이프라인 실행 상태 및 성공 시각/기사 수 반환."""
@@ -223,6 +237,28 @@ async def api_live_latest() -> JSONResponse:
     if payload is None:
         return JSONResponse(status_code=404, content={"error": "latest.json not found"})
     return JSONResponse(content=payload)
+
+
+@app.get("/api/live/stream")
+async def api_live_stream() -> StreamingResponse:
+    async def event_generator():
+        previous_version = ""
+        while True:
+            snapshot = _latest_version_snapshot()
+            if snapshot and snapshot["version"] != previous_version:
+                previous_version = snapshot["version"]
+                yield "event: version\n"
+                yield f"data: {json.dumps(snapshot, ensure_ascii=False)}\n\n"
+            else:
+                yield ": keepalive\n\n"
+            await asyncio.sleep(2.0)
+
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+    }
+    return StreamingResponse(event_generator(), media_type="text/event-stream", headers=headers)
 
 
 @app.get("/api/live/v/{version}/{artifact}")

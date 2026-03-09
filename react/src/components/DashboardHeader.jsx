@@ -2,6 +2,16 @@ import React from "react";
 import { Pill } from "./ui.jsx";
 import { formatDateTimeGST } from "../lib/utils.js";
 
+function connectionBadgeConfig(status) {
+  if (status === "connected") {
+    return { label: "SSE", value: "connected", color: "#22c55e" };
+  }
+  if (status === "reconnecting") {
+    return { label: "SSE", value: "reconnecting", color: "#f59e0b" };
+  }
+  return { label: "SSE", value: "fallback", color: "#6b7280" };
+}
+
 function staleBannerConfig(severity) {
   if (severity === "CRITICAL") {
     return {
@@ -40,9 +50,11 @@ export default function DashboardHeader({
   isOffline,
   stateTs,
   sourceHealthLabel,
+  liveConnectionStatus,
 }) {
   const staleConfig = staleBannerConfig(derived.staleSeverity);
   const liveLagMinutes = derived.liveLagMinutes ?? Math.floor((derived.liveLagSeconds || 0) / 60);
+  const connectionBadge = connectionBadgeConfig(liveConnectionStatus);
 
   return (
     <>
@@ -88,6 +100,7 @@ export default function DashboardHeader({
           </div>
           <div className="header-actions">
             <Pill label="MODE" value={derived.modeState} color={derived.modeColor} />
+            <Pill label={connectionBadge.label} value={connectionBadge.value} color={connectionBadge.color} />
             <Pill
               label="Gate"
               value={derived.gateState}
