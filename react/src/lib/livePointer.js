@@ -69,3 +69,85 @@ export async function fetchPointerArtifact(url) {
     return null;
   }
 }
+
+export function connectLivePointerStream({
+  candidates = [],
+  onVersion,
+  onStatus,
+  onError
+} = {}) {
+  if (typeof EventSource === "undefined" || !Array.isArray(candidates) || !candidates.length) {
+    return () => {};
+  }
+
+  let source = null;
+  let closed = false;
+  let reconnectTimer = null;
+  let candidateIdx = 0;
+
+  const setStatus = (status) => {
+    if (typeof onStatus === "function") onStatus(status);
+  };
+
+  const cleanup = () => {
+    if (source) {
+      source.close();
+      source = null;
+    }
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+  };
+
+  const scheduleReconnect = () => {
+    if (closed) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      candidateIdx = (candidateIdx + 1) % candidates.length;
+      connect();
+    }, 2000);
+  };
+
+  const connect = () => {
+    cleanup();
+    const pointerUrl = candidates[candidateIdx];
+    const streamUrl = resolveArtifactUrl(pointerUrl, "/api/live/stream");
+    setStatus("reconnecting");
+
+    try {
+      source = new EventSource(streamUrl);
+    } catch (error) {
+      if (typeof onError === "function") onError(error);
+      scheduleReconnect();
+      return;
+    }
+
+    source.addEventListener("open", () => {
+      setStatus("connected");
+    });
+
+    source.addEventListener("version", (event) => {
+      try {
+        const payload = JSON.parse(event.data || "{}");
+        if (typeof onVersion === "function") onVersion(payload);
+      } catch (error) {
+        if (typeof onError === "function") onError(error);
+      }
+    });
+
+    source.addEventListener("error", (event) => {
+      if (typeof onError === "function") onError(event);
+      setStatus("reconnecting");
+      cleanup();
+      scheduleReconnect();
+    });
+  };
+
+  connect();
+
+  return () => {
+    closed = true;
+    cleanup();
+  };
+}
