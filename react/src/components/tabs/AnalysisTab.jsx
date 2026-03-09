@@ -25,7 +25,7 @@ export default function AnalysisTab({
 
   return (
     <div className="analysis-layout">
-      <Card>
+      <Card className="analysis-card">
         <div className="split-header">
           <div>
             <div className="section-title">📈 Hypothesis Trend Graph</div>
@@ -48,7 +48,7 @@ export default function AnalysisTab({
             ]}
           />
         </div>
-        <div className="two-col section-gap">
+        <div className="analysis-spark-grid section-gap">
           <div>
             <div className="sparkline-header"><span>ΔScore trend</span><span>{derived.ds.toFixed(3)}</span></div>
             <Sparkline data={histDs} min={-0.2} max={0.6} color="#f59e0b" selectedIndex={selectedHistoryIndex} />
@@ -61,7 +61,7 @@ export default function AnalysisTab({
         <HistoryPlayback history={history} selectedIndex={selectedHistoryIndex} onSelect={onSelectHistoryIndex} />
       </Card>
 
-      <Card style={{ marginBottom: 0 }}>
+      <Card className="analysis-card">
         <div className="split-header" style={{ marginBottom: 12 }}>
           <div>
             <div className="section-title">🧾 Decision Trace Review</div>

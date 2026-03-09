@@ -1,5 +1,10 @@
+import { StrictMode } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { DATA_REVALIDATION_POLICY } from "../lib/constants.js";
+import { cacheLastDash, loadCachedDash } from "../lib/offlineCache.js";
+import { fetchLatestPointer, fetchPointerArtifact } from "../lib/livePointer.js";
 
 const mockState = vi.hoisted(() => ({
   cachedPayload: {
@@ -56,6 +61,42 @@ const mockState = vi.hoisted(() => ({
   }
 }));
 
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+function makeLiveDashboard(stateTs) {
+  return {
+    ...mockState.cachedPayload.dashboard,
+    metadata: {
+      ...mockState.cachedPayload.dashboard.metadata,
+      stateTs,
+      status: "live",
+      source: "fixture://live"
+    }
+  };
+}
+
+function resetLocalStorage() {
+  if (!window.localStorage) return;
+  if (typeof window.localStorage.clear === "function") {
+    window.localStorage.clear();
+    return;
+  }
+  const keys = [];
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (key) keys.push(key);
+  }
+  keys.forEach((key) => window.localStorage.removeItem(key));
+}
+
 vi.mock("../lib/livePointer.js", () => ({
   fetchLatestPointer: vi.fn(async () => {
     throw new Error("pointer offline");
@@ -83,12 +124,25 @@ import { useDashboardData } from "./useDashboardData.js";
 
 describe("useDashboardData", () => {
   beforeEach(() => {
+    resetLocalStorage();
     vi.stubGlobal("fetch", vi.fn(async () => {
       throw new Error("network down");
     }));
+    vi.mocked(fetchLatestPointer).mockReset();
+    vi.mocked(fetchLatestPointer).mockImplementation(async () => {
+      throw new Error("pointer offline");
+    });
+    vi.mocked(fetchPointerArtifact).mockReset();
+    vi.mocked(fetchPointerArtifact).mockResolvedValue(null);
+    vi.mocked(loadCachedDash).mockReset();
+    vi.mocked(loadCachedDash).mockImplementation(async () => mockState.cachedPayload);
+    vi.mocked(cacheLastDash).mockReset();
+    vi.mocked(cacheLastDash).mockResolvedValue(null);
   });
 
   afterEach(() => {
+    vi.useRealTimers();
+    resetLocalStorage();
     vi.unstubAllGlobals();
   });
 
@@ -137,6 +191,72 @@ describe("useDashboardData", () => {
 
     expect(result.current.selectedRouteId).toBe(null);
 
+    unmount();
+  });
+
+  it("continues polling after StrictMode re-runs the effect setup", async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetchLatestPointer).mockResolvedValue({
+      version: "live-v1",
+      liteUrl: "/lite/live-v1"
+    });
+    vi.mocked(fetchPointerArtifact).mockImplementation(async (url) => {
+      if (url === "/lite/live-v1") return makeLiveDashboard("2026-03-06T10:07:00Z");
+      return null;
+    });
+
+    const wrapper = ({ children }) => <StrictMode>{children}</StrictMode>;
+    const { unmount } = renderHook(() => useDashboardData(), { wrapper });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const callsAfterMount = vi.mocked(fetchLatestPointer).mock.calls.length;
+    expect(callsAfterMount).toBeGreaterThan(0);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DATA_REVALIDATION_POLICY.pollIntervalMs);
+      await Promise.resolve();
+    });
+
+    expect(fetchLatestPointer).toHaveBeenCalledTimes(callsAfterMount + 1);
+
+    unmount();
+  });
+
+  it("ignores stale bootstrap responses from the previous StrictMode polling session", async () => {
+    const firstPointer = createDeferred();
+    vi.mocked(fetchLatestPointer)
+      .mockImplementationOnce(() => firstPointer.promise)
+      .mockResolvedValue({
+        version: "live-v2",
+        liteUrl: "/lite/live-v2"
+      });
+    vi.mocked(fetchPointerArtifact).mockImplementation(async (url) => {
+      if (url === "/lite/live-v1") return makeLiveDashboard("2026-03-06T10:07:00Z");
+      if (url === "/lite/live-v2") return makeLiveDashboard("2026-03-06T10:08:00Z");
+      return null;
+    });
+
+    const wrapper = ({ children }) => <StrictMode>{children}</StrictMode>;
+    const { result, unmount } = renderHook(() => useDashboardData(), { wrapper });
+
+    await waitFor(() => expect(result.current.dash.metadata.source).toBe("/lite/live-v2"));
+
+    firstPointer.resolve({
+      version: "live-v1",
+      liteUrl: "/lite/live-v1"
+    });
+
+    await act(async () => {
+      await firstPointer.promise;
+      await Promise.resolve();
+    });
+
+    expect(fetchPointerArtifact).not.toHaveBeenCalledWith("/lite/live-v1");
+    expect(result.current.dash.metadata.source).toBe("/lite/live-v2");
     unmount();
   });
 });

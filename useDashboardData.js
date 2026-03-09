@@ -6,15 +6,10 @@ import { normalizeIncomingPayload } from "../lib/normalize.js";
 import { mergeTimelineWithNoiseGate } from "../lib/noiseGate.js";
 import { loadCachedDash, cacheLastDash } from "../lib/offlineCache.js";
 import { requestNotifPermission, sendCrisisNotif } from "../lib/notifications.js";
-import {
-  buildFullReport,
-  buildKpiSnapshot,
-  buildOfflineSummary,
-  resolveExperimentVariants
-} from "../lib/summary.js";
+import { buildFullReport, buildOfflineSummary } from "../lib/summary.js";
 import { alertSound, warnSound } from "../lib/sounds.js";
 import { appendHistory, buildDiffEvents, computeDashboardKey, mkEvent } from "../lib/timelineRules.js";
-import { connectLivePointerStream, fetchLatestPointer, fetchPointerArtifact } from "../lib/livePointer.js";
+import { fetchLatestPointer, fetchPointerArtifact } from "../lib/livePointer.js";
 import {
   FALLBACK_EGRESS_LOSS_ETA,
   DATA_REVALIDATION_POLICY,
@@ -40,34 +35,6 @@ import {
 } from "../lib/utils.js";
 
 const FAST_FAIL_THRESHOLD = 5;
-const SSE_FALLBACK_RETRY_MS = 15000;
-const SAFETY_POLL_MS = 7 * 60 * 1000;
-
-const TELEMETRY_STORAGE_KEY = "urgentdash_anon_telemetry";
-const TELEMETRY_SESSION_KEY = "urgentdash_anon_session";
-const TELEMETRY_MAX_ITEMS = 500;
-
-function nowIso() {
-  return new Date().toISOString();
-}
-
-function readTelemetryQueue() {
-  const parsed = safeJsonParse(safeGetLS(TELEMETRY_STORAGE_KEY, "[]"), []);
-  return Array.isArray(parsed) ? parsed : [];
-}
-
-function appendTelemetryEvent(event) {
-  const queue = [...readTelemetryQueue(), event].slice(-TELEMETRY_MAX_ITEMS);
-  safeSetLS(TELEMETRY_STORAGE_KEY, JSON.stringify(queue));
-}
-
-function getOrCreateAnonSessionId() {
-  const existing = safeGetLS(TELEMETRY_SESSION_KEY, "");
-  if (existing) return existing;
-  const id = `anon-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
-  safeSetLS(TELEMETRY_SESSION_KEY, id);
-  return id;
-}
 
 const TABS = [
   { id: "overview", label: "Overview", icon: "📊" },
@@ -108,23 +75,18 @@ export function useDashboardData() {
   const [cachedAt, setCachedAt] = useState(null);
   const [isOffline, setIsOffline] = useState(typeof navigator !== "undefined" ? !navigator.onLine : false);
   const [selectedHistoryIndex, setSelectedHistoryIndex] = useState(0);
-  const [liveConnectionStatus, setLiveConnectionStatus] = useState("fallback");
-  const [telemetryEvents, setTelemetryEvents] = useState([]);
 
   const mounted = useRef(true);
-  const tabEnteredAtRef = useRef(Date.now());
-  const routeViewStartedAtRef = useRef(null);
   const synced = useRef(false);
   const dashRef = useRef(INITIAL_DASHBOARD);
   const prevDashRef = useRef(null);
   const prevDerivedRef = useRef(null);
+  const pollSessionRef = useRef(0);
   const fastFailCountRef = useRef(0);
   const fastFailLoggedRef = useRef(false);
   const latestVersionRef = useRef("");
   const latestAiVersionRef = useRef("");
   const lastSummaryKeyRef = useRef("");
-  const sseFallbackTimerRef = useRef(null);
-  const pollSessionRef = useRef(0);
 
   const fastPollMs = useMemo(() => {
     const env = Number(import.meta?.env?.VITE_FAST_POLL_MS);
@@ -132,18 +94,12 @@ export function useDashboardData() {
     return DATA_REVALIDATION_POLICY.pollIntervalMs;
   }, []);
   const fastCountdownSeconds = useMemo(() => Math.max(1, Math.ceil(fastPollMs / 1000)), [fastPollMs]);
-  const relaxedPollMs = useMemo(() => Math.max(fastPollMs * 3, 30000), [fastPollMs]);
   const latestCandidates = useMemo(() => getLatestCandidates(), []);
   const legacyCandidates = useMemo(
     () => [...new Set([...getFastStateCandidates(), ...getDashboardCandidates()])],
     []
   );
   const derived = useMemo(() => deriveState(dash, egressLossETA), [dash, egressLossETA]);
-  const experiments = useMemo(() => resolveExperimentVariants(), []);
-  const kpiSnapshot = useMemo(
-    () => buildKpiSnapshot({ dashboard: dash, telemetry: telemetryEvents }),
-    [dash, telemetryEvents]
-  );
 
   useEffect(() => {
     dashRef.current = dash;
@@ -169,17 +125,6 @@ export function useDashboardData() {
     setAutoSummary(safeGetLS(STORAGE_KEYS.autoSummary, "0") === "1");
     setNotifEnabled(safeGetLS(STORAGE_KEYS.notifications, "0") === "1");
     setSoundEnabled(safeGetLS(STORAGE_KEYS.sound, "0") === "1");
-    const existingTelemetry = readTelemetryQueue();
-    setTelemetryEvents(existingTelemetry);
-
-    const sessionId = getOrCreateAnonSessionId();
-    const hasPreviousSession = existingTelemetry.some((event) => event.type === "session_start");
-    const bootEvents = [{ type: "session_start", sessionId, ts: nowIso() }];
-    if (hasPreviousSession) {
-      bootEvents.push({ type: "session_revisit", sessionId, ts: nowIso() });
-    }
-    bootEvents.forEach((event) => appendTelemetryEvent(event));
-    setTelemetryEvents((prev) => [...prev, ...bootEvents].slice(-TELEMETRY_MAX_ITEMS));
   }, []);
 
   useEffect(() => {
@@ -233,17 +178,6 @@ export function useDashboardData() {
     setTimeline((prev) => mergeTimelineWithNoiseGate(prev, [mkEvent(event)], { maxItems: TIMELINE_MAX }));
   }, []);
 
-  const trackTelemetry = useCallback((event) => {
-    const sessionId = getOrCreateAnonSessionId();
-    const payload = {
-      ts: nowIso(),
-      sessionId,
-      ...event
-    };
-    appendTelemetryEvent(payload);
-    setTelemetryEvents((prev) => [...prev, payload].slice(-TELEMETRY_MAX_ITEMS));
-  }, []);
-
   const fetchCandidates = useCallback(async (candidates = []) => {
     for (const candidate of candidates) {
       try {
@@ -271,14 +205,7 @@ export function useDashboardData() {
 
     if (notifEnabled) {
       important.forEach((event) => {
-        const sent = sendCrisisNotif(event);
-        trackTelemetry({
-          type: "alert_response",
-          level: event.level,
-          acknowledged: Boolean(sent),
-          resolved: true,
-          falseAlarm: false
-        });
+        sendCrisisNotif(event);
       });
     }
     if (soundEnabled) {
@@ -288,7 +215,7 @@ export function useDashboardData() {
         warnSound();
       }
     }
-  }, [notifEnabled, soundEnabled, trackTelemetry]);
+  }, [notifEnabled, soundEnabled]);
 
   const applyDashboard = useCallback((nextDash, { announce = true } = {}) => {
     const mergedDash = {
@@ -329,56 +256,46 @@ export function useDashboardData() {
     return true;
   }, []);
 
-  const isActivePollSession = useCallback((sessionId) => {
-    return mounted.current && sessionId === pollSessionRef.current;
-  }, []);
+  const fetchLatestState = useCallback(async (showLoading = false, options = {}) => {
+    const sessionId = options.sessionId ?? pollSessionRef.current;
+    const isStaleSession = () => !mounted.current || sessionId !== pollSessionRef.current;
 
-  const syncFromPointer = useCallback(async (pointer, { forceLite = false, isCurrentSession = () => mounted.current } = {}) => {
-    if (!pointer) throw new Error("Latest pointer unavailable");
-    if (!isCurrentSession()) return;
-    if ((forceLite || pointer.version !== latestVersionRef.current || !synced.current) && pointer.liteUrl) {
-      const litePayload = await fetchPointerArtifact(pointer.liteUrl);
-      const normalized = normalizeIncomingPayload(litePayload);
-      if (!normalized) throw new Error("Invalid lite snapshot");
-      if (!isCurrentSession()) return;
-      if (normalized.metadata) normalized.metadata.source = pointer.liteUrl;
-      const merged = applyDashboard(normalized);
-      await cacheLastDash(merged);
-      if (!isCurrentSession()) return;
-      latestVersionRef.current = pointer.version;
-      latestAiVersionRef.current = "";
-    }
-
-    if (pointer.aiVersion && pointer.aiUrl && pointer.aiVersion !== latestAiVersionRef.current) {
-      const aiPayload = await fetchPointerArtifact(pointer.aiUrl);
-      if (aiPayload && isCurrentSession()) {
-        applyAiAnalysis(aiPayload);
-        latestAiVersionRef.current = pointer.aiVersion;
-      }
-    } else if (!pointer.aiVersion && latestAiVersionRef.current) {
-      if (!isCurrentSession()) return;
-      latestAiVersionRef.current = "";
-      setDash((prev) => {
-        const next = prev?.aiAnalysis ? { ...prev, aiAnalysis: null } : prev;
-        dashRef.current = next;
-        return next;
-      });
-    }
-  }, [applyAiAnalysis, applyDashboard]);
-
-  const fetchLatestState = useCallback(async (showLoading = false, sessionId = pollSessionRef.current) => {
-    const isCurrentSession = () => isActivePollSession(sessionId);
-
-    if (showLoading && isCurrentSession()) setLoading(true);
+    if (showLoading) setLoading(true);
 
     try {
       const pointer = await fetchLatestPointer(latestCandidates);
       if (!pointer) throw new Error("Latest pointer unavailable");
-      if (!isCurrentSession()) return;
 
-      await syncFromPointer(pointer, { isCurrentSession });
+      if (pointer.version !== latestVersionRef.current || !synced.current) {
+        const litePayload = await fetchPointerArtifact(pointer.liteUrl);
+        const normalized = normalizeIncomingPayload(litePayload);
+        if (!normalized) throw new Error("Invalid lite snapshot");
+        if (isStaleSession()) return;
+        if (normalized.metadata) normalized.metadata.source = pointer.liteUrl;
+        const merged = applyDashboard(normalized);
+        await cacheLastDash(merged);
+        latestVersionRef.current = pointer.version;
+        latestAiVersionRef.current = "";
+      }
 
-      if (!isCurrentSession()) return;
+      if (pointer.aiVersion && pointer.aiUrl && pointer.aiVersion !== latestAiVersionRef.current) {
+        const aiPayload = await fetchPointerArtifact(pointer.aiUrl);
+        if (aiPayload) {
+          if (isStaleSession()) return;
+          applyAiAnalysis(aiPayload);
+          latestAiVersionRef.current = pointer.aiVersion;
+        }
+      } else if (!pointer.aiVersion && latestAiVersionRef.current) {
+        if (isStaleSession()) return;
+        latestAiVersionRef.current = "";
+        setDash((prev) => {
+          const next = prev?.aiAnalysis ? { ...prev, aiAnalysis: null } : prev;
+          dashRef.current = next;
+          return next;
+        });
+      }
+
+      if (isStaleSession()) return;
       setLastUpdated(new Date());
       setNextEta(fastCountdownSeconds);
       setError(null);
@@ -397,14 +314,12 @@ export function useDashboardData() {
       fastFailCountRef.current = 0;
       fastFailLoggedRef.current = false;
     } catch (pointerErr) {
-      if (!isCurrentSession()) return;
       try {
         const normalized = await fetchCandidates(legacyCandidates);
         if (!normalized) throw new Error("Legacy snapshot unavailable");
-        if (!isCurrentSession()) return;
+        if (isStaleSession()) return;
         const merged = applyDashboard(normalized);
         await cacheLastDash(merged);
-        if (!isCurrentSession()) return;
         latestVersionRef.current = "";
         latestAiVersionRef.current = "";
         setLastUpdated(new Date());
@@ -420,12 +335,11 @@ export function useDashboardData() {
           noiseKey: "SYSTEM|LATEST_POINTER|FALLBACK"
         });
       } catch (legacyErr) {
-        if (!isCurrentSession()) return;
         try {
           const cached = await loadCachedDash();
           const normalized = normalizeIncomingPayload(cached?.dashboard);
           if (!normalized) throw new Error("No cached dashboard");
-          if (!isCurrentSession()) return;
+          if (isStaleSession()) return;
           applyDashboard(normalized, { announce: false });
           setLastUpdated(cached?.cachedAt ? new Date(cached.cachedAt) : new Date());
           setNextEta(fastCountdownSeconds);
@@ -440,8 +354,8 @@ export function useDashboardData() {
             noiseKey: "SYSTEM|CACHED_DASH|USED"
           });
         } catch {
-          if (!isCurrentSession()) return;
           fastFailCountRef.current += 1;
+          if (isStaleSession()) return;
           if (!synced.current) applyDashboard(INITIAL_DASHBOARD, { announce: false });
           setUsingCachedData(false);
           setCachedAt(null);
@@ -459,9 +373,9 @@ export function useDashboardData() {
         }
       }
     } finally {
-      if (showLoading && isCurrentSession()) setLoading(false);
+      if (showLoading && !isStaleSession()) setLoading(false);
     }
-  }, [fastCountdownSeconds, fetchCandidates, isActivePollSession, latestCandidates, legacyCandidates, logEvent, syncFromPointer]);
+  }, [applyAiAnalysis, applyDashboard, fastCountdownSeconds, fetchCandidates, latestCandidates, legacyCandidates, logEvent]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -475,107 +389,26 @@ export function useDashboardData() {
     const sessionId = pollSessionRef.current + 1;
     pollSessionRef.current = sessionId;
 
-    void fetchLatestState(true, sessionId);
+    void fetchLatestState(true, { sessionId });
     const intervalId = setInterval(() => {
-      void fetchLatestState(false, sessionId);
-    }, liveConnectionStatus === "connected" ? relaxedPollMs : fastPollMs);
+      void fetchLatestState(false, { sessionId });
+    }, fastPollMs);
 
     return () => {
       clearInterval(intervalId);
       if (pollSessionRef.current === sessionId) {
-        pollSessionRef.current += 1;
+        pollSessionRef.current = sessionId + 1;
       }
     };
-  }, [fastPollMs, fetchLatestState, liveConnectionStatus, relaxedPollMs]);
-
-  useEffect(() => {
-    let hasConnected = false;
-    const stop = connectLivePointerStream({
-      candidates: latestCandidates,
-      onStatus: (status) => {
-        if (!mounted.current) return;
-        if (status === "connected") {
-          hasConnected = true;
-          setLiveConnectionStatus("connected");
-          if (sseFallbackTimerRef.current) {
-            clearTimeout(sseFallbackTimerRef.current);
-            sseFallbackTimerRef.current = null;
-          }
-          return;
-        }
-        setLiveConnectionStatus((prev) => (prev === "connected" ? "reconnecting" : prev));
-      },
-      onVersion: async (event) => {
-        const sessionId = pollSessionRef.current;
-        const isCurrentSession = () => isActivePollSession(sessionId);
-        if (!isCurrentSession()) return;
-        if (!event?.version || event.version === latestVersionRef.current) return;
-        try {
-          const pointer = await fetchLatestPointer(latestCandidates);
-          await syncFromPointer(pointer, { forceLite: true, isCurrentSession });
-          if (!isCurrentSession()) return;
-          setLastUpdated(new Date());
-          setNextEta(fastCountdownSeconds);
-          setError(null);
-        } catch {
-          if (isCurrentSession()) setLiveConnectionStatus("fallback");
-        }
-      },
-      onError: () => {
-        if (!mounted.current) return;
-        setLiveConnectionStatus((prev) => (prev === "connected" ? "reconnecting" : prev));
-      }
-    });
-
-    sseFallbackTimerRef.current = setTimeout(() => {
-      if (mounted.current && !hasConnected) {
-        setLiveConnectionStatus("fallback");
-      }
-    }, SSE_FALLBACK_RETRY_MS);
-
-    return () => {
-      stop();
-      if (sseFallbackTimerRef.current) {
-        clearTimeout(sseFallbackTimerRef.current);
-        sseFallbackTimerRef.current = null;
-      }
-    };
-  }, [fastCountdownSeconds, isActivePollSession, latestCandidates, syncFromPointer]);
-
-  useEffect(() => {
-    const safetyPollId = setInterval(() => {
-      void fetchLatestState(false, pollSessionRef.current);
-    }, SAFETY_POLL_MS);
-    return () => clearInterval(safetyPollId);
-  }, [fetchLatestState]);
+  }, [fastPollMs, fetchLatestState]);
 
   useEffect(() => {
     if (!autoSummary) return;
     const key = computeDashboardKey(dash);
     if (!key || key === lastSummaryKeyRef.current) return;
     lastSummaryKeyRef.current = key;
-    setSummary({
-      text: buildOfflineSummary(dash, derived, { experiments, kpis: kpiSnapshot, telemetry: telemetryEvents }),
-      ts: new Date().toISOString(),
-      mode: "OFFLINE"
-    });
-  }, [autoSummary, dash, derived, experiments, kpiSnapshot, telemetryEvents]);
-
-  useEffect(() => {
-    const currentTs = Date.now();
-    const prevEnteredAt = tabEnteredAtRef.current;
-    if (prevEnteredAt) {
-      trackTelemetry({
-        type: "tab_usage",
-        tab,
-        dwellSeconds: Math.max(0, (currentTs - prevEnteredAt) / 1000)
-      });
-    }
-    tabEnteredAtRef.current = currentTs;
-    if (tab === "routes") {
-      routeViewStartedAtRef.current = currentTs;
-    }
-  }, [tab, trackTelemetry]);
+    setSummary({ text: buildOfflineSummary(dash, derived), ts: new Date().toISOString(), mode: "OFFLINE" });
+  }, [autoSummary, dash, derived]);
 
   useEffect(() => {
     const tabMap = {
@@ -642,24 +475,6 @@ export function useDashboardData() {
       .sort((a, b) => a.eff - b.eff);
   }, [dash.routes]);
 
-  const selectRoute = useCallback((nextRouteIdOrUpdater) => {
-    setSelectedRouteId((prevRouteId) => {
-      const nextRouteId = typeof nextRouteIdOrUpdater === "function"
-        ? nextRouteIdOrUpdater(prevRouteId)
-        : nextRouteIdOrUpdater;
-
-      const nowMs = Date.now();
-      const viewedAt = routeViewStartedAtRef.current ?? nowMs;
-      trackTelemetry({
-        type: "route_selected",
-        routeId: nextRouteId || "none",
-        decisionSeconds: Math.max(0, (nowMs - viewedAt) / 1000)
-      });
-      routeViewStartedAtRef.current = nowMs;
-      return nextRouteId;
-    });
-  }, [trackTelemetry]);
-
   const filteredIntelFeed = useMemo(() => {
     if (intelFilter === "ALL") return dash.intelFeed || [];
     return (dash.intelFeed || []).filter((item) => item.priority === intelFilter);
@@ -708,14 +523,10 @@ export function useDashboardData() {
   }, [logEvent]);
 
   const generateSummary = useCallback(() => {
-    const text = buildOfflineSummary(dashRef.current, deriveState(dashRef.current, egressLossETA), {
-      experiments,
-      kpis: kpiSnapshot,
-      telemetry: telemetryEvents
-    });
+    const text = buildOfflineSummary(dashRef.current, deriveState(dashRef.current, egressLossETA));
     setSummary({ text, ts: new Date().toISOString(), mode: "OFFLINE" });
     logEvent({ level: "INFO", category: "SUMMARY", title: "Summary generated" });
-  }, [egressLossETA, experiments, kpiSnapshot, logEvent, telemetryEvents]);
+  }, [egressLossETA, logEvent]);
 
   const copySummary = useCallback(async () => {
     const ok = await tryCopyText(summary.text);
@@ -724,38 +535,30 @@ export function useDashboardData() {
   }, [logEvent, summary.text]);
 
   const exportReport = useCallback(() => {
-    const text = buildFullReport(dashRef.current, deriveState(dashRef.current, egressLossETA), {
-      experiments,
-      kpis: kpiSnapshot,
-      telemetry: telemetryEvents
-    });
+    const text = buildFullReport(dashRef.current, deriveState(dashRef.current, egressLossETA));
     const name = `urgentdash_report_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.txt`;
     downloadText(name, text);
     logEvent({ level: "INFO", category: "SUMMARY", title: "Report exported", detail: name });
-  }, [egressLossETA, experiments, kpiSnapshot, logEvent, telemetryEvents]);
+  }, [egressLossETA, logEvent]);
 
   const toggleNotifications = useCallback(async () => {
     if (notifEnabled) {
       setNotifEnabled(false);
-      trackTelemetry({ type: "notification_preference", enabled: false, action: "disabled" });
       return false;
     }
     const status = await requestNotifPermission();
     if (status === "granted") {
       setNotifEnabled(true);
       setError(null);
-      trackTelemetry({ type: "notification_preference", enabled: true, action: "permission_granted" });
       return true;
     }
     if (status === "unsupported") {
-      trackTelemetry({ type: "notification_preference", enabled: false, action: "unsupported" });
       setError("브라우저가 알림을 지원하지 않습니다.");
     } else {
       setError("브라우저 알림 권한이 거부되었습니다.");
-      trackTelemetry({ type: "notification_preference", enabled: false, action: "permission_denied" });
     }
     return false;
-  }, [notifEnabled, trackTelemetry]);
+  }, [notifEnabled]);
 
   const toggleSound = useCallback(() => {
     setSoundEnabled((prev) => !prev);
@@ -768,7 +571,6 @@ export function useDashboardData() {
     now,
     nextEta,
     fastCountdownSeconds,
-    liveConnectionStatus,
     dash,
     derived,
     egressLossETA,
@@ -782,7 +584,7 @@ export function useDashboardData() {
     history,
     timeline,
     selectedRouteId,
-    setSelectedRouteId: selectRoute,
+    setSelectedRouteId,
     summary,
     autoSummary,
     setAutoSummary,
@@ -804,9 +606,6 @@ export function useDashboardData() {
     histEc,
     usableRoutes,
     filteredIntelFeed,
-    experiments,
-    kpiSnapshot,
-    telemetryEvents,
     fetchLatestState,
     logEvent,
     exportTimeline,

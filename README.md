@@ -298,3 +298,4 @@ Vercel 배포본은 same-origin `/api/live/latest`, `/api/live/v/...`, `/api/sta
 - [LAYOUT.md](./LAYOUT.md)
 - [의존성.md](./의존성.md)
 - [patchplan.md](./patchplan.md)
+- [MERGE_HISTORY_2026-03-09.md](./MERGE_HISTORY_2026-03-09.md)

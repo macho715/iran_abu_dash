@@ -1,24 +1,25 @@
 {
-  "state_ts": "2026-03-07T15:53:00+04:00",
+  "state_ts": "2026-03-09T17:28:53+04:00",
   "status": "degraded",
   "source_health": {
     "tier0_us_embassy_uae": {
       "name": "US Embassy UAE",
       "url": "https://ae.usembassy.gov/u-s-citizen-services/security-and-travel-information/",
       "tier": "TIER0",
-      "status": "http_non_2xx",
-      "ok": false,
-      "checked_at": "2026-03-07T15:52:49+04:00",
-      "http_status": 407,
-      "error": "Client error '407 ' for url 'https://ae.usembassy.gov/u-s-citizen-services/security-and-travel-information/'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/407"
+      "status": "ok",
+      "ok": true,
+      "checked_at": "2026-03-09T17:28:44+04:00",
+      "http_status": 200
     },
     "tier0_kr_mofa_0404": {
       "name": "KR MOFA 0404",
       "url": "https://www.0404.go.kr/dev/newest_list.mofa",
       "tier": "TIER0",
-      "status": "timeout",
+      "status": "http_non_2xx",
       "ok": false,
-      "checked_at": "2026-03-07T15:52:49+04:00"
+      "checked_at": "2026-03-09T17:28:44+04:00",
+      "http_status": 404,
+      "error": "Client error '404 Not Found' for url 'https://www.0404.go.kr/dev/newest_list.mofa'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404"
     },
     "tier0_uk_fcdo_uae": {
       "name": "UK FCDO UAE Advice",
@@ -26,7 +27,7 @@
       "tier": "TIER0",
       "status": "ok",
       "ok": true,
-      "checked_at": "2026-03-07T15:52:49+04:00",
+      "checked_at": "2026-03-09T17:28:44+04:00",
       "http_status": 200
     },
     "tier0_etihad_updates": {
@@ -35,7 +36,7 @@
       "tier": "TIER0",
       "status": "timeout",
       "ok": false,
-      "checked_at": "2026-03-07T15:52:49+04:00"
+      "checked_at": "2026-03-09T17:28:44+04:00"
     },
     "tier0_emirates_updates": {
       "name": "Emirates Updates",
@@ -43,24 +44,27 @@
       "tier": "TIER0",
       "status": "ok",
       "ok": true,
-      "checked_at": "2026-03-07T15:52:49+04:00",
+      "checked_at": "2026-03-09T17:28:44+04:00",
       "http_status": 200
     },
     "tier0_gcaa": {
       "name": "UAE GCAA",
       "url": "https://www.gcaa.gov.ae/en/Pages/default.aspx",
       "tier": "TIER0",
-      "status": "timeout",
-      "ok": false,
-      "checked_at": "2026-03-07T15:52:49+04:00"
+      "status": "ok",
+      "ok": true,
+      "checked_at": "2026-03-09T17:28:44+04:00",
+      "http_status": 200
     },
     "tier0_uae_mod": {
       "name": "UAE Ministry of Defence",
       "url": "https://www.mod.gov.ae/en/media-center/news.aspx",
       "tier": "TIER0",
-      "status": "timeout",
+      "status": "http_non_2xx",
       "ok": false,
-      "checked_at": "2026-03-07T15:52:49+04:00"
+      "checked_at": "2026-03-09T17:28:44+04:00",
+      "http_status": 404,
+      "error": "Client error '404 Not Found' for url 'https://mod.gov.ae/en/media-center/news.aspx'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404"
     },
     "tier1_aljazeera_middle_east": {
       "name": "Al Jazeera Middle East",
@@ -68,7 +72,7 @@
       "tier": "TIER1",
       "status": "ok",
       "ok": true,
-      "checked_at": "2026-03-07T15:52:49+04:00",
+      "checked_at": "2026-03-09T17:28:44+04:00",
       "http_status": 200
     },
     "tier1_reuters_world": {
@@ -77,7 +81,7 @@
       "tier": "TIER1",
       "status": "http_non_2xx",
       "ok": false,
-      "checked_at": "2026-03-07T15:52:49+04:00",
+      "checked_at": "2026-03-09T17:28:44+04:00",
       "http_status": 401,
       "error": "Client error '401 HTTP Forbidden' for url 'https://www.reuters.com/world/middle-east/'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401"
     },
@@ -87,7 +91,7 @@
       "tier": "TIER1",
       "status": "ok",
       "ok": true,
-      "checked_at": "2026-03-07T15:52:49+04:00",
+      "checked_at": "2026-03-09T17:28:44+04:00",
       "http_status": 200
     },
     "tier1_cnn_breaking": {
@@ -96,7 +100,7 @@
       "tier": "TIER1",
       "status": "ok",
       "ok": true,
-      "checked_at": "2026-03-07T15:52:49+04:00",
+      "checked_at": "2026-03-09T17:28:44+04:00",
       "http_status": 200
     },
     "tier1_canada_uae_advisory": {
@@ -105,7 +109,7 @@
       "tier": "TIER1",
       "status": "ok",
       "ok": true,
-      "checked_at": "2026-03-07T15:52:49+04:00",
+      "checked_at": "2026-03-09T17:28:44+04:00",
       "http_status": 200
     },
     "tier1_downdetector_uae": {
@@ -114,7 +118,7 @@
       "tier": "TIER1",
       "status": "http_non_2xx",
       "ok": false,
-      "checked_at": "2026-03-07T15:52:49+04:00",
+      "checked_at": "2026-03-09T17:28:44+04:00",
       "http_status": 403,
       "error": "Client error '403 Forbidden' for url 'https://downdetector.ae/'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403"
     },
@@ -124,16 +128,17 @@
       "tier": "TIER1",
       "status": "ok",
       "ok": true,
-      "checked_at": "2026-03-07T15:52:49+04:00",
+      "checked_at": "2026-03-09T17:28:44+04:00",
       "http_status": 200
     },
     "tier1_azure_status": {
       "name": "Azure Status",
       "url": "https://azure.status.microsoft.com/en-us/status",
       "tier": "TIER1",
-      "status": "timeout",
+      "status": "unreachable",
       "ok": false,
-      "checked_at": "2026-03-07T15:52:49+04:00"
+      "checked_at": "2026-03-09T17:28:44+04:00",
+      "error": "[Errno 11001] getaddrinfo failed"
     },
     "tier1_nation_thailand": {
       "name": "Nation Thailand",
@@ -141,7 +146,7 @@
       "tier": "TIER1",
       "status": "ok",
       "ok": true,
-      "checked_at": "2026-03-07T15:52:49+04:00",
+      "checked_at": "2026-03-09T17:28:44+04:00",
       "http_status": 200
     },
     "tier1_ndtv_world": {
@@ -150,7 +155,7 @@
       "tier": "TIER1",
       "status": "http_non_2xx",
       "ok": false,
-      "checked_at": "2026-03-07T15:52:49+04:00",
+      "checked_at": "2026-03-09T17:28:44+04:00",
       "http_status": 403,
       "error": "Client error '403 Forbidden' for url 'https://www.ndtv.com/world-news'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403"
     },
@@ -160,7 +165,7 @@
       "tier": "TIER2",
       "status": "ok",
       "ok": true,
-      "checked_at": "2026-03-07T15:52:49+04:00",
+      "checked_at": "2026-03-09T17:28:44+04:00",
       "http_status": 200
     },
     "tier2_khaleej_times": {
@@ -169,7 +174,7 @@
       "tier": "TIER2",
       "status": "ok",
       "ok": true,
-      "checked_at": "2026-03-07T15:52:49+04:00",
+      "checked_at": "2026-03-09T17:28:44+04:00",
       "http_status": 200
     },
     "tier2_gulf_news": {
@@ -178,7 +183,7 @@
       "tier": "TIER2",
       "status": "ok",
       "ok": true,
-      "checked_at": "2026-03-07T15:52:49+04:00",
+      "checked_at": "2026-03-09T17:28:44+04:00",
       "http_status": 200
     },
     "tier2_waze_live_map": {
@@ -187,7 +192,7 @@
       "tier": "TIER2",
       "status": "ok",
       "ok": true,
-      "checked_at": "2026-03-07T15:52:49+04:00",
+      "checked_at": "2026-03-09T17:28:44+04:00",
       "http_status": 200
     },
     "tier2_oman_border": {
@@ -196,22 +201,23 @@
       "tier": "TIER2",
       "status": "ok",
       "ok": true,
-      "checked_at": "2026-03-07T15:52:49+04:00",
+      "checked_at": "2026-03-09T17:28:44+04:00",
       "http_status": 200
     },
     "tier2_port_fujairah": {
       "name": "Port of Fujairah",
       "url": "https://www.fujairahport.ae/",
       "tier": "TIER2",
-      "status": "timeout",
-      "ok": false,
-      "checked_at": "2026-03-07T15:52:49+04:00"
+      "status": "ok",
+      "ok": true,
+      "checked_at": "2026-03-09T17:28:44+04:00",
+      "http_status": 200
     }
   },
   "degraded": true,
   "flags": [
     "SOURCE_DEGRADED",
-    "SOURCE_FAILURES:tier0_etihad_updates,tier0_gcaa,tier0_kr_mofa_0404,tier0_uae_mod,tier0_us_embassy_uae,tier1_azure_status"
+    "SOURCE_FAILURES:tier0_etihad_updates,tier0_kr_mofa_0404,tier0_uae_mod,tier1_azure_status,tier1_downdetector_uae,tier1_ndtv_world"
   ],
   "indicators": [
     {
@@ -221,8 +227,8 @@
       "state": 0.92,
       "confirmed": true,
       "detail": "UK FCDO UAE Advice: matched do not travel, do not travel",
-      "ts": "2026-03-07T15:52:49+04:00",
-      "tsIso": "2026-03-07T15:52:49+04:00",
+      "ts": "2026-03-09T17:28:44+04:00",
+      "tsIso": "2026-03-09T17:28:44+04:00",
       "src": "UK FCDO UAE Advice",
       "src_count": 1,
       "srcCount": 1,
@@ -235,12 +241,12 @@
       "tier": "TIER0",
       "state": 0.92,
       "confirmed": true,
-      "detail": "Emirates Updates: matched cancel, disruption, flight, cancel | Iranian missiles, drones hit near Nakhchivan Airport in Azerbaijan",
-      "ts": "2026-03-07T15:52:49+04:00",
-      "tsIso": "2026-03-07T15:52:49+04:00",
-      "src": "Al Bawaba News, BBC World, Emirates Updates",
-      "src_count": 3,
-      "srcCount": 3,
+      "detail": "Emirates Updates: matched cancel, disruption, flight, cancel | Iran President Massoud Pezeshkian warned Sunday that the Islamic republic \"will be forced to respond\" against its neighbours if their territory was used to attack it",
+      "ts": "2026-03-09T17:28:44+04:00",
+      "tsIso": "2026-03-09T17:28:44+04:00",
+      "src": "BBC Middle East, Emirates Updates, Khaleej Times (Search), UAE GCAA",
+      "src_count": 4,
+      "srcCount": 4,
       "cv": true,
       "crossVerified": true
     },
@@ -250,9 +256,9 @@
       "tier": "TIER1",
       "state": 0.748,
       "confirmed": true,
-      "detail": "Iran says will not target neighbours unless attack originates from them | Israel launches 'broad-scale' attack on Tehran; Iran says targets heart of Tel Aviv",
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
+      "detail": "Iran President Massoud Pezeshkian warned Sunday that the Islamic republic \"will be forced to respond\" against its neighbours if their territory was used to attack it | Iran says will not target neighbours unless attack originates from them",
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
       "src": "Al Bawaba News, Al Jazeera Middle East, BBC Middle East, BBC World",
       "src_count": 5,
       "srcCount": 5,
@@ -266,11 +272,11 @@
       "state": 0.68,
       "confirmed": true,
       "detail": "Canada Travel Advisory UAE: matched avoid, advisory, avoid, security | Waze Live Map: matched road closed, blocked, traffic, jam",
-      "ts": "2026-03-07T15:52:49+04:00",
-      "tsIso": "2026-03-07T15:52:49+04:00",
-      "src": "Canada Travel Advisory UAE, Waze Live Map",
-      "src_count": 2,
-      "srcCount": 2,
+      "ts": "2026-03-09T17:28:44+04:00",
+      "tsIso": "2026-03-09T17:28:44+04:00",
+      "src": "Canada Travel Advisory UAE, Port of Fujairah, Waze Live Map",
+      "src_count": 3,
+      "srcCount": 3,
       "cv": true,
       "crossVerified": true
     },
@@ -278,11 +284,11 @@
       "id": "I05",
       "name": "통신/인프라",
       "tier": "TIER1",
-      "state": 0.688,
+      "state": 0.582,
       "confirmed": false,
       "detail": "No fresh signal in this cycle",
-      "ts": "2026-03-07T15:53:00+04:00",
-      "tsIso": "2026-03-07T15:53:00+04:00",
+      "ts": "2026-03-09T17:28:53+04:00",
+      "tsIso": "2026-03-09T17:28:53+04:00",
       "src": "none",
       "src_count": 0,
       "srcCount": 0,
@@ -293,12 +299,12 @@
       "id": "I06",
       "name": "필수재/연료",
       "tier": "TIER2",
-      "state": 0.527,
+      "state": 0.329,
       "confirmed": false,
-      "detail": "Watch:  How war in Iran may affect food and fuel prices",
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
-      "src": "BBC World",
+      "detail": "Khaleej Times: matched fuel, stock",
+      "ts": "2026-03-09T17:28:44+04:00",
+      "tsIso": "2026-03-09T17:28:44+04:00",
+      "src": "Khaleej Times",
       "src_count": 1,
       "srcCount": 1,
       "cv": false,
@@ -310,9 +316,9 @@
       "tier": "TIER0",
       "state": 0.68,
       "confirmed": false,
-      "detail": "Nation Thailand: matched evacuation, evacuation, middle east | Israel strikes Beirut after evacuation warning sparks panic",
-      "ts": "2026-03-07T15:52:49+04:00",
-      "tsIso": "2026-03-07T15:52:49+04:00",
+      "detail": "Israel strikes Beirut after evacuation warning sparks panic | Nation Thailand: matched middle east",
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
       "src": "BBC Middle East, Nation Thailand",
       "src_count": 2,
       "srcCount": 2,
@@ -324,25 +330,25 @@
     {
       "id": "H0",
       "name": "정상",
-      "score": 0.189
+      "score": 0.209
     },
     {
       "id": "H1",
       "name": "악화",
-      "score": 0.725
+      "score": 0.689
     },
     {
       "id": "H2",
       "name": "철수준비",
-      "score": 0.955
+      "score": 0.93
     }
   ],
-  "evidence_conf": 0.535,
+  "evidence_conf": 0.577,
   "urgency": 0.75,
   "effective_threshold": 0.688,
   "egress_loss_eta": 12.0,
   "egress_eta_source": "estimated_border",
-  "slack_hours": -5.86,
+  "slack_hours": -8.09,
   "routes": [
     {
       "id": "A",
@@ -351,7 +357,7 @@
       "base_h": 7.0,
       "congestion": 0.95,
       "effective_h": 21.84,
-      "note": "Border closure signal; Border closure signal; Border closure signal; Border closure signal; Border closure signal; Al Ain congestion; Route A blocked"
+      "note": "Border closure signal; Border closure signal; Border closure signal; Border closure signal; Al Ain congestion; Route A blocked"
     },
     {
       "id": "B",
@@ -360,7 +366,7 @@
       "base_h": 8.2,
       "congestion": 0.95,
       "effective_h": 25.58,
-      "note": "Border closure signal; Border closure signal; Border closure signal; Border closure signal; Border closure signal"
+      "note": "Border closure signal; Border closure signal; Border closure signal; Border closure signal"
     },
     {
       "id": "C",
@@ -374,10 +380,10 @@
     {
       "id": "D",
       "name": "Fujairah → Khatmat → Muscat",
-      "status": "OPEN",
+      "status": "CAUTION",
       "base_h": 9.3,
-      "congestion": 0.2,
-      "effective_h": 17.86,
+      "congestion": 0.35,
+      "effective_h": 20.09,
       "note": "Default route"
     }
   ],
@@ -389,223 +395,271 @@
     "comms_degraded": true,
     "kr_leave_immediately": false
   },
-  "delta_score": 0.23,
+  "delta_score": 0.241,
   "intel_feed": [
     {
-      "ts": "2026-03-07T15:52:49+04:00",
-      "tsIso": "2026-03-07T15:52:49+04:00",
-      "priority": "CRITICAL",
-      "verified": true,
-      "text": "UK FCDO UAE Advice: matched do not travel, do not travel",
-      "src": "UK FCDO UAE Advice",
-      "impact": "I01 updated (score=0.92)"
-    },
-    {
-      "ts": "2026-03-07T15:52:49+04:00",
-      "tsIso": "2026-03-07T15:52:49+04:00",
-      "priority": "CRITICAL",
-      "verified": true,
-      "text": "Emirates Updates: matched cancel, disruption, flight, cancel",
-      "src": "Emirates Updates",
-      "impact": "I02 updated (score=0.92)"
-    },
-    {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
       "priority": "CRITICAL",
       "verified": false,
-      "text": "Iran says will not target neighbours unless attack originates from them",
-      "src": "Khaleej Times (Search)",
-      "impact": "I03 updated (score=0.88)"
-    },
-    {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
-      "priority": "CRITICAL",
-      "verified": false,
-      "text": "Israel launches 'broad-scale' attack on Tehran; Iran says targets heart of Tel Aviv",
-      "src": "Khaleej Times (Search)",
-      "impact": "I03 updated (score=0.88)"
-    },
-    {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
-      "priority": "CRITICAL",
-      "verified": false,
-      "text": "The Israeli military said it carried out 26 overnight strike waves on southern suburbs, targeting Hezbollah command centres and weapons storage facilities",
-      "src": "Khaleej Times (Search)",
-      "impact": "I03 updated (score=0.88)"
-    },
-    {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
-      "priority": "CRITICAL",
-      "verified": false,
-      "text": "Qatar foils 10 drones, 2 cruise missile attacks from Iran Wednesday morning",
-      "src": "Khaleej Times (Search)",
-      "impact": "I03 updated (score=0.88)"
-    },
-    {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
-      "priority": "CRITICAL",
-      "verified": false,
-      "text": "UAE after Iran attack: Is remote work mandatory, are there movement restrictions?",
-      "src": "Khaleej Times (Search)",
-      "impact": "I03 updated (score=0.88)"
-    },
-    {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
-      "priority": "CRITICAL",
-      "verified": false,
-      "text": "Debris from intercepted drone injures 6 in Abu Dhabi, UAE",
-      "src": "Al Bawaba News",
-      "impact": "I03 updated (score=0.88)"
-    },
-    {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
-      "priority": "CRITICAL",
-      "verified": false,
-      "text": "Iranian missile targeting NATO base in Turkey intercepted, tensions soar",
-      "src": "Al Bawaba News",
-      "impact": "I03 updated (score=0.88)"
-    },
-    {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
-      "priority": "CRITICAL",
-      "verified": false,
-      "text": "Saudi Arabia reports attempted attack on Aramco's Ras Tanura",
-      "src": "Al Bawaba News",
-      "impact": "I03 updated (score=0.88)"
-    },
-    {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
-      "priority": "CRITICAL",
-      "verified": false,
-      "text": "Russian LNG tanker sinks off Libya after naval drone attack",
-      "src": "Al Bawaba News",
-      "impact": "I03 updated (score=0.88)"
-    },
-    {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
-      "priority": "CRITICAL",
-      "verified": false,
-      "text": "Missile debris kill an 11-year-old girl in Kuwait",
-      "src": "Al Bawaba News",
-      "impact": "I03 updated (score=0.88)"
-    },
-    {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
-      "priority": "CRITICAL",
-      "verified": false,
-      "text": "Why did US and Israel attack Iran and how long could the war last?",
-      "src": "BBC Middle East",
-      "impact": "I03 updated (score=0.88)"
-    },
-    {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
-      "priority": "CRITICAL",
-      "verified": false,
-      "text": "'Massive' numbers killed by gunmen in latest Nigeria attack, senator tells BBC",
+      "text": "Watch: Ukrainian anti-drone 'bullet' that could help defend Gulf",
       "src": "BBC World",
-      "impact": "I03 updated (score=0.88)"
+      "impact": "I03 updated (score=0.88)",
+      "status": "fresh",
+      "firstSeenTs": "2026-03-09T17:28:28+04:00"
     },
     {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
       "priority": "CRITICAL",
       "verified": false,
-      "text": "Russian strike on Kharkiv apartment block kills seven",
+      "text": "Police release images of Oslo US embassy explosion suspect",
       "src": "BBC World",
-      "impact": "I03 updated (score=0.88)"
+      "impact": "I03 updated (score=0.88)",
+      "status": "fresh",
+      "firstSeenTs": "2026-03-09T17:28:28+04:00"
     },
     {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
-      "priority": "CRITICAL",
-      "verified": false,
-      "text": "Canadian teen died from drowning after dingo attack in Australia",
-      "src": "BBC World",
-      "impact": "I03 updated (score=0.88)"
-    },
-    {
-      "ts": "2026-03-07T15:52:49+04:00",
-      "tsIso": "2026-03-07T15:52:49+04:00",
-      "priority": "HIGH",
-      "verified": true,
-      "text": "Al Jazeera Middle East: matched missile, drone, explosion, iran",
-      "src": "Al Jazeera Middle East",
-      "impact": "I03 updated (score=0.8)"
-    },
-    {
-      "ts": "2026-03-07T15:52:49+04:00",
-      "tsIso": "2026-03-07T15:52:49+04:00",
+      "ts": "2026-03-09T17:28:44+04:00",
+      "tsIso": "2026-03-09T17:28:44+04:00",
       "priority": "HIGH",
       "verified": true,
       "text": "BBC World: matched attack, drone, missile, iran",
       "src": "BBC World",
-      "impact": "I03 updated (score=0.8)"
+      "impact": "I03 updated (score=0.8)",
+      "status": "fresh",
+      "firstSeenTs": "2026-03-09T17:28:44+04:00"
     },
     {
-      "ts": "2026-03-07T15:52:49+04:00",
-      "tsIso": "2026-03-07T15:52:49+04:00",
-      "priority": "HIGH",
-      "verified": true,
-      "text": "Canada Travel Advisory UAE: matched avoid, advisory, avoid, security",
-      "src": "Canada Travel Advisory UAE",
-      "impact": "I04 updated (score=0.8)"
-    },
-    {
-      "ts": "2026-03-07T15:52:49+04:00",
-      "tsIso": "2026-03-07T15:52:49+04:00",
-      "priority": "HIGH",
-      "verified": true,
-      "text": "Nation Thailand: matched evacuation, evacuation, middle east",
-      "src": "Nation Thailand",
-      "impact": "I07 updated (score=0.8)"
-    },
-    {
-      "ts": "2026-03-07T15:52:49+04:00",
-      "tsIso": "2026-03-07T15:52:49+04:00",
-      "priority": "HIGH",
-      "verified": true,
-      "text": "Waze Live Map: matched road closed, blocked, traffic, jam",
-      "src": "Waze Live Map",
-      "impact": "I04 updated (score=0.8)"
-    },
-    {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
       "priority": "HIGH",
       "verified": false,
       "text": "Israel strikes Beirut after evacuation warning sparks panic",
       "src": "BBC Middle East",
-      "impact": "I07 updated (score=0.8)"
+      "impact": "I07 updated (score=0.8)",
+      "status": "fresh",
+      "firstSeenTs": "2026-03-09T17:28:28+04:00"
     },
     {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
-      "priority": "HIGH",
+      "ts": "2026-03-09T17:28:44+04:00",
+      "tsIso": "2026-03-09T17:28:44+04:00",
+      "priority": "MEDIUM",
       "verified": false,
-      "text": "Iranian missiles, drones hit near Nakhchivan Airport in Azerbaijan",
-      "src": "Al Bawaba News",
-      "impact": "I02 updated (score=0.78)"
+      "text": "Nation Thailand: matched middle east",
+      "src": "Nation Thailand",
+      "impact": "I07 updated (score=0.41)",
+      "status": "fresh",
+      "firstSeenTs": "2026-03-09T17:28:44+04:00"
     },
     {
-      "ts": "2026-03-07T15:52:32+04:00",
-      "tsIso": "2026-03-07T15:52:32+04:00",
-      "priority": "HIGH",
+      "ts": "2026-03-09T17:28:44+04:00",
+      "tsIso": "2026-03-09T17:28:44+04:00",
+      "priority": "CRITICAL",
+      "verified": true,
+      "text": "UK FCDO UAE Advice: matched do not travel, do not travel",
+      "src": "UK FCDO UAE Advice",
+      "impact": "I01 updated (score=0.92)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-07T15:52:49+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:44+04:00",
+      "tsIso": "2026-03-09T17:28:44+04:00",
+      "priority": "CRITICAL",
+      "verified": true,
+      "text": "Emirates Updates: matched cancel, disruption, flight, cancel",
+      "src": "Emirates Updates",
+      "impact": "I02 updated (score=0.92)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-07T15:52:49+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
+      "priority": "CRITICAL",
       "verified": false,
-      "text": "Flight paths squeezed as Iran conflict closes more airspace",
+      "text": "Qatar foils 10 drones, 2 cruise missile attacks from Iran Wednesday morning",
+      "src": "Khaleej Times (Search)",
+      "impact": "I03 updated (score=0.88)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-07T15:52:32+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
+      "priority": "CRITICAL",
+      "verified": false,
+      "text": "Israel launches 'broad-scale' attack on Tehran; Iran says targets heart of Tel Aviv",
+      "src": "Khaleej Times (Search)",
+      "impact": "I03 updated (score=0.88)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-07T15:52:32+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
+      "priority": "CRITICAL",
+      "verified": false,
+      "text": "Iran says will not target neighbours unless attack originates from them",
+      "src": "Khaleej Times (Search)",
+      "impact": "I03 updated (score=0.88)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-07T15:52:32+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
+      "priority": "CRITICAL",
+      "verified": false,
+      "text": "Iran President Massoud Pezeshkian warned Sunday that the Islamic republic \"will be forced to respond\" against its neighbours if their territory was used to attack it",
+      "src": "Khaleej Times (Search)",
+      "impact": "I02, I03 updated (score=0.88)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-09T16:14:35+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
+      "priority": "CRITICAL",
+      "verified": false,
+      "text": "Explosion at US embassy in Oslo may have been terrorism, Norway police say",
       "src": "BBC World",
-      "impact": "I02 updated (score=0.78)"
+      "impact": "I03 updated (score=0.88)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-09T16:14:35+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
+      "priority": "CRITICAL",
+      "verified": false,
+      "text": "Why did US and Israel attack Iran and how long could the war last?",
+      "src": "BBC Middle East",
+      "impact": "I03 updated (score=0.88)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-07T15:52:32+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
+      "priority": "CRITICAL",
+      "verified": false,
+      "text": "Watch: Moment of drone strike close to Dubai Airport",
+      "src": "BBC Middle East",
+      "impact": "I02, I03 updated (score=0.88)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-09T16:14:35+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
+      "priority": "CRITICAL",
+      "verified": false,
+      "text": "Kuwaiti government high-rise hit by Iranian drone",
+      "src": "BBC Middle East",
+      "impact": "I03 updated (score=0.88)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-09T16:14:35+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
+      "priority": "CRITICAL",
+      "verified": false,
+      "text": "Three people injured in Bahrain by missile debris",
+      "src": "Al Bawaba News",
+      "impact": "I03 updated (score=0.88)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-09T16:14:35+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
+      "priority": "CRITICAL",
+      "verified": false,
+      "text": "Synagogue damaged in an explosion in Belgium",
+      "src": "Al Bawaba News",
+      "impact": "I03 updated (score=0.88)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-09T16:14:35+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
+      "priority": "CRITICAL",
+      "verified": false,
+      "text": "Sudan: Drone strikes on two markets kill 33",
+      "src": "Al Bawaba News",
+      "impact": "I03 updated (score=0.88)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-09T16:14:35+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
+      "priority": "CRITICAL",
+      "verified": false,
+      "text": "Fire erupts at Bapco oil refinery in Bahrain after Iranian attack",
+      "src": "Al Bawaba News",
+      "impact": "I03 updated (score=0.88)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-09T16:14:35+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
+      "priority": "CRITICAL",
+      "verified": false,
+      "text": "Explosive \"Russian drone\" strikes British base in Cyprus",
+      "src": "Al Bawaba News",
+      "impact": "I03 updated (score=0.88)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-09T16:14:35+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:44+04:00",
+      "tsIso": "2026-03-09T17:28:44+04:00",
+      "priority": "HIGH",
+      "verified": true,
+      "text": "Waze Live Map: matched road closed, blocked, traffic, jam",
+      "src": "Waze Live Map",
+      "impact": "I04 updated (score=0.8)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-07T15:52:49+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:44+04:00",
+      "tsIso": "2026-03-09T17:28:44+04:00",
+      "priority": "HIGH",
+      "verified": true,
+      "text": "Canada Travel Advisory UAE: matched avoid, advisory, avoid, security",
+      "src": "Canada Travel Advisory UAE",
+      "impact": "I04 updated (score=0.8)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-07T15:52:49+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:44+04:00",
+      "tsIso": "2026-03-09T17:28:44+04:00",
+      "priority": "HIGH",
+      "verified": true,
+      "text": "Al Jazeera Middle East: matched missile, drone, iran, uae",
+      "src": "Al Jazeera Middle East",
+      "impact": "I03 updated (score=0.8)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-09T16:14:47+04:00"
+    },
+    {
+      "ts": "2026-03-09T17:28:28+04:00",
+      "tsIso": "2026-03-09T17:28:28+04:00",
+      "priority": "HIGH",
+      "verified": false,
+      "text": "Kuwait airport, Bahrain desalination unit struck as Iran presses Gulf attacks",
+      "src": "Khaleej Times (Search)",
+      "impact": "I02 updated (score=0.78)",
+      "status": "repeated",
+      "firstSeenTs": "2026-03-09T16:14:35+04:00"
     }
   ],
   "checklist": [
@@ -650,7 +704,7 @@
       "done": false
     }
   ],
-  "snapshot_ts": "2026-03-07T15:53:00+04:00",
+  "snapshot_ts": "2026-03-09T17:28:53+04:00",
   "state_version": "hyie-erc2-v2026.05",
   "route_geo": {
     "nodes": {
@@ -750,5 +804,8 @@
         "profile": "driving"
       }
     }
-  }
+  },
+  "version": "2026-03-09T13-28-53Z",
+  "schemaVersion": "2025.10",
+  "generatedAt": "2026-03-09T13:28:53Z"
 }

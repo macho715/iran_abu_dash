@@ -43,14 +43,15 @@ export default function TabBar({ tabs = [], activeTab, onChange }) {
         const active = activeTab === tab.id;
         return (
           <button
+            type="button"
             key={tab.id}
             className={`tab-button ${active ? "is-active" : ""}`}
-            onClick={() => onChange(tab.id)}
             role="tab"
             aria-selected={active}
             id={`tab-${tab.id}`}
             aria-controls={`panel-${tab.id}`}
             tabIndex={active ? 0 : -1}
+            onClick={() => onChange(tab.id)}
             onKeyDown={(event) => handleKeyDown(event, index)}
             ref={(node) => {
               if (node) {

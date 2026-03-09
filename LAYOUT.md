@@ -6,6 +6,18 @@ HyIE ERC² 대시보드 UI 레이아웃 및 컴포넌트 구성.
 
 ## 1. 전체 레이아웃
 
+### 전체 셸 구조 (App.jsx)
+
+최종 레이아웃은 **DashboardAside** 기반의 `header + main + aside` 셸이다 (PR #8, MERGE_HISTORY_2026-03-09 기준).
+
+| 영역 | 역할 |
+|------|------|
+| header | DashboardHeader (제목, Pill, Refresh, 알림/사운드, stale 배너) |
+| main | 탭 패널 영역. `section[role="tabpanel"]`, `id="panel-${tab}"`, `aria-labelledby="tab-${tab}"` 적용 |
+| aside | DashboardAside (보조 패널, 레이아웃에 따라 사용) |
+
+`dashboard-shell`, `dashboard-content`, `dashboard-aside` 클래스로 구분된다. 탭별 콘텐츠는 main 영역 안에서 전환된다.
+
 ### 1.1 루트 컨테이너
 
 | 속성 | 값 | 파일 |
@@ -447,3 +459,4 @@ flowchart TD
 - [SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md)
 - [의존성.md](./의존성.md)
 - [patchplan.md](./patchplan.md)
+- [MERGE_HISTORY_2026-03-09.md](./MERGE_HISTORY_2026-03-09.md)

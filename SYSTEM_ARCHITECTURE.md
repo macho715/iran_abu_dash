@@ -267,3 +267,4 @@ Intel Feed status: `official` 신규 공식 신호, `fresh` 신규 일반 신호
 - [LAYOUT.md](./LAYOUT.md)
 - [의존성.md](./의존성.md)
 - [patchplan.md](./patchplan.md)
+- [MERGE_HISTORY_2026-03-09.md](./MERGE_HISTORY_2026-03-09.md)
