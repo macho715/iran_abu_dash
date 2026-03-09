@@ -110,9 +110,13 @@ jobs:
         if: steps.gate.outputs.should_run == 'true'
         shell: bash
         run: |
-          git fetch origin urgentdash-live:urgentdash-live
           rm -rf /tmp/urgentdash-live
-          git worktree add /tmp/urgentdash-live urgentdash-live
+          if git ls-remote --exit-code --heads origin urgentdash-live > /dev/null 2>&1; then
+            git fetch origin urgentdash-live:urgentdash-live
+            git worktree add /tmp/urgentdash-live urgentdash-live
+          else
+            git worktree add --orphan -b urgentdash-live /tmp/urgentdash-live
+          fi
           mkdir -p /tmp/urgentdash-live/live
           rsync -a live/ /tmp/urgentdash-live/live/
           cd /tmp/urgentdash-live
@@ -212,9 +216,13 @@ jobs:
       - name: Publish AI bundle to urgentdash-live and prune old versions
         shell: bash
         run: |
-          git fetch origin urgentdash-live:urgentdash-live
           rm -rf /tmp/urgentdash-live
-          git worktree add /tmp/urgentdash-live urgentdash-live
+          if git ls-remote --exit-code --heads origin urgentdash-live > /dev/null 2>&1; then
+            git fetch origin urgentdash-live:urgentdash-live
+            git worktree add /tmp/urgentdash-live urgentdash-live
+          else
+            git worktree add --orphan -b urgentdash-live /tmp/urgentdash-live
+          fi
           mkdir -p /tmp/urgentdash-live/live
           rsync -a live/ /tmp/urgentdash-live/live/
           python - <<'PY'
