@@ -55,15 +55,28 @@ describe("/api/state", () => {
       if (requestUrl === latestUrl) {
         return jsonResponse({
           version,
+          schemaVersion: "2025.10",
+          collectedAt: "2026-03-08T17:00:00Z",
+          status: { lite: "ok", ai: "ok" },
           liteUrl: `v/${version}/state-lite.json`,
           aiUrl: `v/${version}/state-ai.json`
         });
       }
       if (requestUrl === liteUrl) {
         return jsonResponse({
+          version,
+          schemaVersion: "2025.10",
+          generatedAt: "2026-03-08T17:00:00Z",
+          state_ts: "2026-03-08T17:00:00Z",
           status: "ok",
+          source_health: {},
+          degraded: false,
+          flags: [],
+          intel_feed: [],
           routes: [],
-          indicators: []
+          indicators: [],
+          hypotheses: [],
+          checklist: []
         });
       }
       if (requestUrl === aiUrl) {
@@ -93,4 +106,71 @@ describe("/api/state", () => {
     expect(response.headers["X-UrgentDash-Publish-Source"]).toBe(FIXED_PUBLISH_SOURCE_LABEL);
     expect(response.headers["X-UrgentDash-State-Mode"]).toBe("latest-pointer-merged");
   });
+
+  it("returns contract error when latest pointer misses schemaVersion", async () => {
+    const latestUrl = buildLiveArtifactUrl("latest.json");
+
+    fetch.mockImplementation(async (url) => {
+      const requestUrl = String(url).replace(/\?ts=\d+$/, "");
+      if (requestUrl === latestUrl) {
+        return jsonResponse({ version: "2026-03-08T16-59-33Z", liteUrl: "v/x/state-lite.json" });
+      }
+      throw new Error(`Unexpected URL: ${requestUrl}`);
+    });
+
+    const response = createResponse();
+    await handler({}, response);
+
+    expect(response.statusCode).toBe(502);
+    expect(JSON.parse(response.body)).toMatchObject({
+      errorCode: "LATEST_CONTRACT_ERROR",
+      reasonCode: "LATEST_REQUIRED_KEYS_MISSING"
+    });
+  });
+
+  it("returns contract error when state payload misses generatedAt", async () => {
+    const version = "2026-03-08T16-59-33Z";
+    const latestUrl = buildLiveArtifactUrl("latest.json");
+    const liteUrl = buildLiveArtifactUrl("v", version, "state-lite.json");
+
+    fetch.mockImplementation(async (url) => {
+      const requestUrl = String(url).replace(/\?ts=\d+$/, "");
+      if (requestUrl === latestUrl) {
+        return jsonResponse({
+          version,
+          schemaVersion: "2025.10",
+          collectedAt: "2026-03-08T17:00:00Z",
+          status: { lite: "ok", ai: "ok" },
+          liteUrl: `v/${version}/state-lite.json`
+        });
+      }
+      if (requestUrl === liteUrl) {
+        return jsonResponse({
+          version,
+          schemaVersion: "2025.10",
+          state_ts: "2026-03-08T17:00:00Z",
+          status: "ok",
+          source_health: {},
+          degraded: false,
+          flags: [],
+          intel_feed: [],
+          routes: [],
+          indicators: [],
+          hypotheses: [],
+          checklist: []
+        });
+      }
+      throw new Error(`Unexpected URL: ${requestUrl}`);
+    });
+
+    const response = createResponse();
+    await handler({}, response);
+
+    expect(response.statusCode).toBe(502);
+    expect(JSON.parse(response.body)).toMatchObject({
+      errorCode: "STATE_CONTRACT_ERROR",
+      reasonCode: "STATE_REQUIRED_KEYS_MISSING"
+    });
+  });
+
 });

@@ -86,4 +86,13 @@ describe("deriveState", () => {
     expect(derived.airspaceSegment).toBe("CLOSED");
     expect(derived.evidenceFloorPassed).toBe(true);
   });
+
+  it("forces degraded mode when schema compatibility fails", () => {
+    const derived = deriveState(createDashboard({ metadata: { schemaCompatible: false, schemaMismatchReason: "SCHEMA_VERSION_UNSUPPORTED" } }));
+
+    expect(derived.schemaMismatch).toBe(true);
+    expect(derived.modeState).toBe("DEGRADED");
+    expect(derived.schemaMismatchReason).toBe("SCHEMA_VERSION_UNSUPPORTED");
+  });
+
 });

@@ -1,9 +1,40 @@
 import { applyProxyHeaders, buildLiveArtifactUrl, fetchUpstreamJson, proxyUpstreamJson } from "./_liveProxy.js";
 
+const LATEST_REQUIRED_KEYS = ["version", "schemaVersion", "collectedAt", "liteUrl", "status"];
+const STATE_REQUIRED_KEYS = [
+  "version",
+  "schemaVersion",
+  "generatedAt",
+  "state_ts",
+  "status",
+  "source_health",
+  "degraded",
+  "flags",
+  "intel_feed",
+  "indicators",
+  "hypotheses",
+  "routes",
+  "checklist"
+];
+
 function resolveArtifactSegments(relPath) {
   const rel = String(relPath || "").trim().replace(/^live\//, "");
   if (!rel.endsWith(".json")) return [];
   return rel.split("/").filter(Boolean);
+}
+
+function missingKeys(payload, requiredKeys) {
+  if (!payload || typeof payload !== "object") return [...requiredKeys];
+  return requiredKeys.filter((key) => !Object.prototype.hasOwnProperty.call(payload, key));
+}
+
+function sendContractError(response, statusCode, errorCode, reasonCode, missing) {
+  response.status(statusCode).send(JSON.stringify({
+    error: errorCode,
+    errorCode,
+    reasonCode,
+    missingKeys: missing
+  }));
 }
 
 export default async function handler(_request, response) {
@@ -13,12 +44,24 @@ export default async function handler(_request, response) {
     const latest = await fetchUpstreamJson(latestUrl);
     if (latest.ok) {
       const pointer = JSON.parse(latest.body || "{}");
+      const latestMissing = missingKeys(pointer, LATEST_REQUIRED_KEYS);
+      if (latestMissing.length) {
+        sendContractError(response, 502, "LATEST_CONTRACT_ERROR", "LATEST_REQUIRED_KEYS_MISSING", latestMissing);
+        return;
+      }
+
       const liteSegments = resolveArtifactSegments(pointer?.liteUrl);
       if (liteSegments.length) {
         const baseUrl = buildLiveArtifactUrl(...liteSegments);
         const baseState = await fetchUpstreamJson(baseUrl);
         if (baseState.ok) {
           const payload = JSON.parse(baseState.body || "{}");
+          const stateMissing = missingKeys(payload, STATE_REQUIRED_KEYS);
+          if (stateMissing.length) {
+            sendContractError(response, 502, "STATE_CONTRACT_ERROR", "STATE_REQUIRED_KEYS_MISSING", stateMissing);
+            return;
+          }
+
           const aiSegments = resolveArtifactSegments(pointer?.aiUrl);
           if (aiSegments.length) {
             const aiUrl = buildLiveArtifactUrl(...aiSegments);

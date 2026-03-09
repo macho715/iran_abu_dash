@@ -42,7 +42,9 @@ export function deriveState(dash, egressLossETAOverride) {
   const effectiveThreshold = Number.isFinite(Number(thresholdFromMeta)) ? clamp01(thresholdFromMeta) : 0.8;
 
   const triggers = dash?.metadata?.triggers || {};
-  const liveDegraded = Boolean(dash?.metadata?.degraded);
+  const schemaMismatch = dash?.metadata?.schemaCompatible === false;
+  const schemaMismatchReason = dash?.metadata?.schemaMismatchReason || null;
+  const liveDegraded = Boolean(dash?.metadata?.degraded) || schemaMismatch;
 
   const gateStay = clamp01(i01?.state) >= 0.7 || Boolean(triggers.kr_leave_immediately);
   const gateStrike = Boolean(triggers.strike_detected) || clamp01(i03?.state) >= 0.7;
@@ -145,7 +147,7 @@ export function deriveState(dash, egressLossETAOverride) {
     i01, i02, i03, i04,
     hypothesesSorted, leadingHypothesis, leadingColor,
     ds, ec, effectiveThreshold, confBand,
-    triggers, liveDegraded,
+    triggers, liveDegraded, schemaMismatch, schemaMismatchReason,
     gateStay, gateStrike, gateRoad, gateActiveCount, gateState,
     modeState, modeColor,
     evidenceState,

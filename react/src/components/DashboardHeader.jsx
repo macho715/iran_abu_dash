@@ -58,6 +58,16 @@ export default function DashboardHeader({
         </div>
       )}
 
+      {derived.schemaMismatch && (
+        <div className="banner banner--severe">
+          <div>
+            <span className="banner__title">🟠 CONTRACT DEGRADED</span>
+            <span className="banner__meta">schemaVersion mismatch ({derived.schemaMismatchReason || "unknown"})</span>
+          </div>
+          <button className="action-button" onClick={onRefresh}>Refresh Now</button>
+        </div>
+      )}
+
       {(usingCachedData || isOffline) && (
         <div className="banner banner--offline">
           <div>
