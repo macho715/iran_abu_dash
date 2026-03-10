@@ -12,7 +12,7 @@ HyIE ERC² 대시보드 UI 레이아웃 및 컴포넌트 구성.
 
 | 영역 | 역할 |
 |------|------|
-| header | DashboardHeader (제목, Pill, Refresh, 알림/사운드, stale 배너) |
+| header | DashboardHeader (제목, Pill, Refresh, 알림/사운드, Ask AI, stale 배너) |
 | main | 탭 패널 영역. `section[role="tabpanel"]`, `id="panel-${tab}"`, `aria-labelledby="tab-${tab}"` 적용 |
 | aside | DashboardAside (보조 패널, 레이아웃에 따라 사용) |
 
@@ -158,7 +158,7 @@ flowchart TD
 
 - `display: flex`, `justify-content: space-between`, `flex-wrap: wrap`
 - 좌측: 제목, GST, last fetch, full sync 정보
-- 우측: Pill (MODE, Gate, I02), Refresh 버튼, 알림/사운드 토글
+- 우측: Pill (MODE, Gate, I02), Refresh 버튼, 알림/사운드 토글, `Ask AI` 버튼, Shortcuts 버튼
 - stale 시 배너: `데이터가 N분 전입니다` (liveLagMinutes 기반)
 - 보조 정보: `latest poll every ... · live lag: ...`
 - 추가 하단 라인: `stateTs: ... · source health: X/Y ok`
@@ -198,7 +198,13 @@ flowchart TD
 
 - `grid 1.15fr 0.85fr`
 - 좌: 상황 선택 (현재 유지/공습 징후/영공 폐쇄/국경 봉쇄/대사관 경보/부분 정상화), 범위 (국지/광역/전면), 시급도 (즉시/오늘 안/대기 가능), 제약 (항공 불가 등), Route quick edit (접힌 섹션)
-- 우: 행동 권고 카드 (action.title/detail/reason, tone: danger/warning/success), 추천 경로 정렬 (권장 배지, ETA, baseline 대비)
+- 우: 행동 권고 카드 (action.title/detail/reason, tone: danger/warning/success), `AI가 추가로 고려할 점 보기` 버튼, 추천 경로 정렬 (권장 배지, ETA, baseline 대비)
+
+### 4.9 Ask AI 오버레이
+
+- `ShortcutsOverlay`와 같은 full-screen overlay 패턴을 재사용
+- 중앙 `dialog` 패널, 질문 textarea, 프리셋 버튼, 최신 응답 1개 표시
+- ESC/배경 클릭 닫기, focus trap, 모바일에서 `min(96vw, 780px)` 폭
 
 ### 4.7 Indicators 탭
 
@@ -368,7 +374,8 @@ flowchart TD
 | 컴포넌트 | 경로 | 역할 |
 |----------|------|------|
 | useDashboardData | `react/src/hooks/useDashboardData.js` | 데이터·폴링·오프라인·알림·사운드 |
-| DashboardHeader | `react/src/components/DashboardHeader.jsx` | 헤더, Pill, Refresh, 알림/사운드, 오프라인 배너 |
+| DashboardHeader | `react/src/components/DashboardHeader.jsx` | 헤더, Pill, Refresh, 알림/사운드, Ask AI, 오프라인 배너 |
+| AskAiPanel | `react/src/components/AskAiPanel.jsx` | 헤더에서 여는 Ask AI 오버레이 |
 | TabBar | `react/src/components/TabBar.jsx` | 탭 버튼 바 |
 | ShortcutsOverlay | `react/src/components/ShortcutsOverlay.jsx` | 키보드 단축키 가이드 |
 | HistoryPlayback | `react/src/components/HistoryPlayback.jsx` | 히스토리 시점 선택 |

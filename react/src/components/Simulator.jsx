@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
+import { callAiChat } from "../lib/aiChat.js";
 import { ROUTE_BUFFER_FACTOR } from "../lib/constants.js";
 import { deriveState } from "../lib/deriveState.js";
 import { normalizeDashboard } from "../lib/normalize.js";
@@ -922,7 +923,11 @@ function WhatIfSlider({ label, min, max, step, value, onChange }) {
 
 export default function Simulator({ liveDash, onLog = () => {} }) {
   const [ui, setUi] = useState(createInitialUiState());
+  const [aiResponse, setAiResponse] = useState("");
+  const [aiError, setAiError] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
   const lastLogSignatureRef = useRef("");
+  const aiAbortRef = useRef(null);
 
   const normalizedLiveDash = useMemo(() => {
     return normalizeDashboard(liveDash || {}) || liveDash || null;
@@ -982,6 +987,16 @@ export default function Simulator({ liveDash, onLog = () => {} }) {
   }, [simDerived, recommendedRoutes, baselineRoutes, ui, sim]);
 
   const overrideCount = useMemo(() => countRouteOverrides(ui.routeOverrides), [ui.routeOverrides]);
+  const aiDecisionKey = useMemo(() => JSON.stringify({
+    title: action?.title || "",
+    detail: action?.detail || "",
+    reason: action?.reason || "",
+    bestRouteId: action?.bestRouteId || "",
+    scenario: ui.scenario,
+    scope: ui.scope,
+    urgency: ui.urgency,
+    constraints: [...(ui.constraints || [])].sort(),
+  }), [action?.bestRouteId, action?.detail, action?.reason, action?.title, ui.constraints, ui.scenario, ui.scope, ui.urgency]);
 
   useEffect(() => {
     if (!action || !simDerived || !hasUserInput(ui)) return;
@@ -1027,6 +1042,21 @@ export default function Simulator({ liveDash, onLog = () => {} }) {
       noiseKey: `SIM|TRACE|${action.title}|${action.bestRouteId ?? "NONE"}`,
     });
   }, [action, onLog, simDerived, ui]);
+
+  useEffect(() => {
+    aiAbortRef.current?.abort();
+    aiAbortRef.current = null;
+    setAiLoading(false);
+    setAiError("");
+    setAiResponse("");
+  }, [aiDecisionKey]);
+
+  useEffect(() => {
+    return () => {
+      aiAbortRef.current?.abort();
+      aiAbortRef.current = null;
+    };
+  }, []);
 
   if (!normalizedLiveDash || !baselineDash || !baselineDerived || !simDash || !simDerived || !action) {
     return <Card>긴급 판단 화면을 준비 중입니다…</Card>;
@@ -1124,6 +1154,62 @@ export default function Simulator({ liveDash, onLog = () => {} }) {
     }));
   };
 
+  const handleAskAi = async () => {
+    if (aiLoading || !action) return;
+
+    aiAbortRef.current?.abort();
+    const controller = new AbortController();
+    aiAbortRef.current = controller;
+
+    const selectedConstraintLabels = CONSTRAINTS
+      .filter((item) => (ui.constraints || []).includes(item.id))
+      .map((item) => item.label);
+
+    setAiLoading(true);
+    setAiError("");
+    setAiResponse("");
+
+    try {
+      const result = await callAiChat({
+        messages: [
+          {
+            role: "system",
+            content: "당신은 긴급 대피 판단 보조 AI입니다. 제공된 요약만 바탕으로 한국어 2~4문장으로 추가 고려사항만 답하고, 새로운 사실을 지어내지 마세요.",
+          },
+          {
+            role: "user",
+            content: [
+              `행동 권고: ${action.title}`,
+              `상세: ${action.detail}`,
+              `이유: ${action.reason}`,
+              `추천 경로: ${action.bestRouteId || "없음"}`,
+              `상황: ${selectedScenario?.label || "현재 유지"}`,
+              `범위: ${selectedScope?.label || "선택 안 함"}`,
+              `시급도: ${selectedUrgency?.label || "선택 안 함"}`,
+              `제약: ${selectedConstraintLabels.length ? selectedConstraintLabels.join(", ") : "없음"}`,
+              `증거 링크: ${action.evidenceLinks.join(" | ")}`,
+            ].join("\n"),
+          },
+        ],
+        signal: controller.signal,
+      });
+
+      if (aiAbortRef.current !== controller) return;
+
+      setAiResponse(result.text);
+      setAiError("");
+    } catch (requestError) {
+      if (controller.signal.aborted) return;
+      setAiError(requestError instanceof Error ? requestError.message : "AI 보조 요청에 실패했습니다.");
+      setAiResponse("");
+    } finally {
+      if (aiAbortRef.current === controller) {
+        aiAbortRef.current = null;
+        setAiLoading(false);
+      }
+    }
+  };
+
   return (
     <Card>
       <div className="split-header">
@@ -1183,6 +1269,24 @@ export default function Simulator({ liveDash, onLog = () => {} }) {
         <div style={{ marginTop: 8, fontSize: 11, color: "#bfdbfe" }}>
           Evidence: {action.evidenceLinks.join(" · ")}
         </div>
+        <div className="filter-row section-gap-top">
+          <button
+            type="button"
+            className="action-button"
+            onClick={handleAskAi}
+            disabled={aiLoading}
+          >
+            {aiLoading ? "AI 검토 중..." : "AI가 추가로 고려할 점 보기"}
+          </button>
+        </div>
+        {(aiLoading || aiError || aiResponse) && (
+          <details className="nested-panel section-gap-top" open>
+            <summary className="section-title">AI 추가 고려사항</summary>
+            {aiLoading && <div className="body-copy section-gap-top">현재 권고를 기준으로 보조 검토를 생성 중입니다…</div>}
+            {aiError && <div className="error-banner section-gap-top">❗ {aiError}</div>}
+            {aiResponse && <div className="body-copy section-gap-top">{aiResponse}</div>}
+          </details>
+        )}
 
         <div className="filter-row" style={{ marginTop: 12 }}>
           <div className="status-chip is-muted">상황 {selectedScenario?.label || "현재 유지"}</div>

@@ -1,5 +1,6 @@
 import React from "react";
 import { Card, Gauge } from "../ui.jsx";
+import SourceGapPanel from "../SourceGapPanel.jsx";
 import { KEY_ASSUMPTIONS } from "../../data/hyieLegacyContent.js";
 import { formatTimeGST } from "../../lib/utils.js";
 import { getAssumptionTheme, getIntelPriorityTheme, getLikelihoodTheme } from "../../lib/statusTheme.js";
@@ -18,10 +19,15 @@ export default function OverviewTab({
   summary,
   onGenerateSummary,
   onCopySummary,
-  onExportReport
+  onExportReport,
+  sourceGapAnalysis,
 }) {
   return (
     <div>
+      <Card>
+        <SourceGapPanel variant="compact" analysis={sourceGapAnalysis} />
+      </Card>
+
       <Card>
         <div className="gauge-grid">
           <Gauge value={Math.min(1, Math.max(0, derived.ec))} label="EvidenceConf" sub={`thr=${derived.effectiveThreshold.toFixed(2)}`} />

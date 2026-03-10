@@ -1,8 +1,9 @@
 import React from "react";
 import { Bar, Card } from "../ui.jsx";
+import SourceGapPanel from "../SourceGapPanel.jsx";
 import { formatTimeGST } from "../../lib/utils.js";
 
-export default function IndicatorsTab({ indicators = [], derived }) {
+export default function IndicatorsTab({ indicators = [], derived, sourceGapAnalysis }) {
   return (
     <div>
       <Card>
@@ -40,6 +41,9 @@ export default function IndicatorsTab({ indicators = [], derived }) {
           <div className="status-text" style={{ color: derived.evidenceFloorPassed ? "#22c55e" : "#f59e0b" }}>
             {derived.evidenceFloorPassed ? "✅ Evidence Floor PASSED" : "⚠ Evidence Floor not reached"} — TIER0 교차검증: {derived.evidenceFloorT0}건
           </div>
+        </div>
+        <div className="nested-panel section-gap">
+          <SourceGapPanel variant="expanded" analysis={sourceGapAnalysis} />
         </div>
       </Card>
     </div>

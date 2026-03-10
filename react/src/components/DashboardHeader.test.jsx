@@ -11,6 +11,7 @@ describe("DashboardHeader", () => {
     const onRefresh = vi.fn();
     const onToggleNotifications = vi.fn();
     const onToggleSound = vi.fn();
+    const onOpenAskAi = vi.fn();
     const onToggleShortcuts = vi.fn();
 
     render(
@@ -29,6 +30,7 @@ describe("DashboardHeader", () => {
         onToggleNotifications={onToggleNotifications}
         soundEnabled
         onToggleSound={onToggleSound}
+        onOpenAskAi={onOpenAskAi}
         onToggleShortcuts={onToggleShortcuts}
         usingCachedData
         cachedAt="2026-03-06T11:59:00Z"
@@ -48,11 +50,13 @@ describe("DashboardHeader", () => {
     fireEvent.click(screen.getAllByRole("button", { name: /Refresh Now|🔄 Refresh/i })[0]);
     fireEvent.click(screen.getByRole("button", { name: /Alerts Off/i }));
     fireEvent.click(screen.getByRole("button", { name: /Sound On/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Ask AI/i }));
     fireEvent.click(screen.getByRole("button", { name: /\? Shortcuts/i }));
 
     expect(onRefresh).toHaveBeenCalled();
     expect(onToggleNotifications).toHaveBeenCalled();
     expect(onToggleSound).toHaveBeenCalled();
+    expect(onOpenAskAi).toHaveBeenCalled();
     expect(onToggleShortcuts).toHaveBeenCalled();
   });
 
@@ -73,6 +77,7 @@ describe("DashboardHeader", () => {
         onToggleNotifications={vi.fn()}
         soundEnabled={false}
         onToggleSound={vi.fn()}
+        onOpenAskAi={vi.fn()}
         onToggleShortcuts={vi.fn()}
         usingCachedData={false}
         cachedAt={null}

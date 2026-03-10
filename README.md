@@ -107,6 +107,24 @@ npm run dev
 
 React는 `VITE_LATEST_CANDIDATES` 또는 기본 후보(`/api/live/latest`, GitHub raw)를 30초마다 poll 한다.
 
+### 2.1 AI Proxy 연동 (01·04 기준)
+
+브라우저가 외부 `myagent-proxy`를 직접 호출한다. 이 저장소는 Vercel용 `/api/ai/chat` 프록시 라우트를 추가하지 않는다.
+
+- 로컬 기본 endpoint: `http://127.0.0.1:3010/api/ai/chat`
+- endpoint 우선순위: `window.__JPT71_AI_ENDPOINT__` → `?aiEndpoint=` → `VITE_AI_ENDPOINT` → localStorage
+- token 우선순위: `window.__JPT71_AI_PROXY_TOKEN__` → `VITE_AI_PROXY_TOKEN` → localStorage
+- 퍼블릭 배포 권장: `react/index.html` 로딩 전 window 주입 또는 서버 렌더 주입
+
+```html
+<script>
+  window.__JPT71_AI_ENDPOINT__ = "https://api.your-domain.com/api/ai/chat";
+  window.__JPT71_AI_PROXY_TOKEN__ = "replace-with-short-lived-token";
+</script>
+```
+
+퍼블릭 프록시는 `myagent-copilot-kit/run-public.ps1` 또는 `run-public.sh`로 실행하고, 배포 전 [09-AI적용-보안검증-정합성](./myagent-copilot-kit/docs/09-AI적용-보안검증-정합성.md) 체크리스트를 따른다.
+
 ### 3. 원샷 실행 (one-shot)
 
 한 사이클만 실행하고 종료. CI/GHA와 동일한 로직.
@@ -213,6 +231,8 @@ flowchart LR
 | `live/v/<version>/state-lite.json` | AI 없는 canonical snapshot (intelFeed, indicators, routes, metadata 등) |
 | `live/v/<version>/state-ai.json` | 같은 version에 대한 AI patch payload |
 | `live/hyie_state.json` | 레거시 호환 merge 결과 (lite+ai) |
+| `react/src/lib/aiConfig.js` | AI endpoint/token 런타임 해석 |
+| `react/src/lib/aiChat.js` | 브라우저 → 프록시 direct AI 호출 |
 
 ## UI 탭 구성
 
@@ -227,6 +247,12 @@ flowchart LR
 | checklist | Checklist | 대피 체크리스트 |
 
 상세 레이아웃: [LAYOUT.md](./LAYOUT.md), [COMPONENTS.md](./COMPONENTS.md)
+
+## AI UI 표면
+
+- `DashboardHeader`의 `Ask AI`: 대시보드 요약만 전송하는 단일 Q/A 모달
+- `Simulator`의 `AI가 추가로 고려할 점 보기`: 현재 권고를 요약해서 온디맨드 보조 응답 표시
+- 두 기능 모두 기존 timeline/log를 오염시키지 않도록 AI 이벤트를 별도 기록하지 않는다
 
 ### 프론트엔드 데이터 흐름 (Mermaid)
 

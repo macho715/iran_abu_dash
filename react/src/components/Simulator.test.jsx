@@ -1,9 +1,15 @@
 import React from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createDashboard } from "../test/fixtures.js";
 import Simulator from "./Simulator.jsx";
+
+vi.mock("../lib/aiChat.js", () => ({
+  callAiChat: vi.fn(),
+}));
+
+import { callAiChat } from "../lib/aiChat.js";
 
 describe("Simulator", () => {
   afterEach(() => {
@@ -86,5 +92,23 @@ describe("Simulator", () => {
 
     rerender(<Simulator liveDash={dash} onLog={onLog} />);
     expect(onLog).toHaveBeenCalledTimes(2);
+  });
+
+  it("requests AI guidance on demand and clears it when the recommendation changes", async () => {
+    vi.mocked(callAiChat).mockResolvedValue({
+      text: "추가로 통신 불안과 야간 이동 리스크를 확인하세요.",
+      payload: {},
+    });
+
+    render(<Simulator liveDash={createDashboard()} onLog={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /AI가 추가로 고려할 점 보기/i }));
+
+    await waitFor(() => expect(callAiChat).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/통신 불안과 야간 이동 리스크/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /영공 폐쇄/i }));
+
+    expect(screen.queryByText(/통신 불안과 야간 이동 리스크/i)).not.toBeInTheDocument();
   });
 });

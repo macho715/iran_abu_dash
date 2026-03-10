@@ -45,6 +45,7 @@ export default function DashboardHeader({
   onToggleNotifications,
   soundEnabled,
   onToggleSound,
+  onOpenAskAi,
   onToggleShortcuts,
   usingCachedData,
   cachedAt,
@@ -136,6 +137,7 @@ export default function DashboardHeader({
             <button className={`action-button ${soundEnabled ? "is-active" : ""}`} onClick={onToggleSound}>
               {soundEnabled ? "🔊 Sound On" : "🔇 Sound Off"}
             </button>
+            <button className="action-button" onClick={onOpenAskAi}>Ask AI</button>
             <button className="action-button action-button--muted" onClick={onToggleShortcuts}>? Shortcuts</button>
           </div>
         </div>

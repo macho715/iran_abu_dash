@@ -1,5 +1,6 @@
 import React from "react";
 
+import AskAiPanel from "./components/AskAiPanel.jsx";
 import DashboardAside from "./components/DashboardAside.jsx";
 import DashboardHeader from "./components/DashboardHeader.jsx";
 import Simulator from "./components/Simulator.jsx";
@@ -12,9 +13,17 @@ import IntelTab from "./components/tabs/IntelTab.jsx";
 import OverviewTab from "./components/tabs/OverviewTab.jsx";
 import RoutesTab from "./components/tabs/RoutesTab.jsx";
 import { useDashboardData } from "./hooks/useDashboardData.js";
+import { useSourceGapAnalysis } from "./hooks/useSourceGapAnalysis.js";
 
 export default function App() {
   const dashboard = useDashboardData();
+  const [showAskAi, setShowAskAi] = React.useState(false);
+  const sourceGapAnalysis = useSourceGapAnalysis({
+    dash: dashboard.dash,
+    derived: dashboard.derived,
+    usableRoutes: dashboard.usableRoutes,
+    summary: dashboard.summary,
+  });
   let tabContent = null;
 
   if (dashboard.tab === "overview") {
@@ -30,6 +39,7 @@ export default function App() {
         onGenerateSummary={dashboard.generateSummary}
         onCopySummary={dashboard.copySummary}
         onExportReport={dashboard.exportReport}
+        sourceGapAnalysis={sourceGapAnalysis}
       />
     );
   } else if (dashboard.tab === "analysis") {
@@ -60,7 +70,13 @@ export default function App() {
       />
     );
   } else if (dashboard.tab === "indicators") {
-    tabContent = <IndicatorsTab indicators={dashboard.dash.indicators || []} derived={dashboard.derived} />;
+    tabContent = (
+      <IndicatorsTab
+        indicators={dashboard.dash.indicators || []}
+        derived={dashboard.derived}
+        sourceGapAnalysis={sourceGapAnalysis}
+      />
+    );
   } else if (dashboard.tab === "routes") {
     tabContent = (
       <RoutesTab
@@ -99,6 +115,7 @@ export default function App() {
             onToggleNotifications={dashboard.toggleNotifications}
             soundEnabled={dashboard.soundEnabled}
             onToggleSound={dashboard.toggleSound}
+            onOpenAskAi={() => setShowAskAi(true)}
             onToggleShortcuts={() => dashboard.setShowShortcuts((prev) => !prev)}
             usingCachedData={dashboard.usingCachedData}
             cachedAt={dashboard.cachedAt}
@@ -149,6 +166,15 @@ export default function App() {
       </div>
 
       <ShortcutsOverlay visible={dashboard.showShortcuts} onClose={() => dashboard.setShowShortcuts(false)} />
+      <AskAiPanel
+        visible={showAskAi}
+        onClose={() => setShowAskAi(false)}
+        dash={dashboard.dash}
+        derived={dashboard.derived}
+        usableRoutes={dashboard.usableRoutes}
+        summary={dashboard.summary}
+        activeTab={dashboard.tab}
+      />
     </div>
   );
 }
